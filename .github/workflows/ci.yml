@@ -18,7 +18,9 @@ jobs:
           distribution: temurin
           java-version: '21'
       - name: Build + test (Testcontainers uses the Docker daemon on the runner)
-        run: ./gradlew --no-daemon build
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon build
 
   test-frontend:
     runs-on: ubuntu-latest
@@ -62,6 +64,7 @@ jobs:
       - name: Boot app
         working-directory: naukrinearby
         run: |
+          chmod +x ./gradlew
           ./gradlew --no-daemon bootJar -x test
           nohup java -jar build/libs/*.jar > app.log 2>&1 &
           for i in $(seq 1 60); do
