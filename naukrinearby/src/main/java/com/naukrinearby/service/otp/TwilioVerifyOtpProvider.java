@@ -25,11 +25,9 @@ import org.springframework.web.client.RestClient;
 @ConditionalOnProperty(name = "naukri.otp.provider", havingValue = "twilio")
 public class TwilioVerifyOtpProvider implements OtpProvider {
 
-	private final TwilioProperties props;
 	private final RestClient client;
 
 	public TwilioVerifyOtpProvider(TwilioProperties props) {
-		this.props = props;
 		var factory = new SimpleClientHttpRequestFactory();
 		factory.setConnectTimeout(5_000);
 		factory.setReadTimeout(10_000);

@@ -19,6 +19,7 @@ class TestcontainersConfiguration {
 
 	@Bean
 	@ServiceConnection
+	@SuppressWarnings("resource")
 	ElasticsearchContainer elasticsearchContainer() {
 		return new ElasticsearchContainer(
 				DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:8.13.0"))
@@ -40,11 +41,13 @@ class TestcontainersConfiguration {
 
 	@Bean
 	@ServiceConnection(name = "redis")
+	@SuppressWarnings("resource")
 	GenericContainer<?> redisContainer() {
 		return new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
 	}
 
 	@Bean
+	@SuppressWarnings("resource")
 	GenericContainer<?> minioContainer() {
 		return new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
 				.withExposedPorts(9000)

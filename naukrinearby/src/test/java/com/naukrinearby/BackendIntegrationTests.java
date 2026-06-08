@@ -9,7 +9,6 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import com.naukrinearby.exception.DuplicateApplicationException;
 import com.naukrinearby.model.dto.job.JobCreateRequest;
 import com.naukrinearby.model.entity.Employer;
-import com.naukrinearby.model.entity.NotificationLog;
 import com.naukrinearby.model.entity.User;
 import com.naukrinearby.model.enums.JobCategory;
 import com.naukrinearby.model.enums.UserRole;
@@ -53,7 +52,7 @@ class BackendIntegrationTests {
 	@LocalServerPort int port;
 
 	@Test
-	@SuppressWarnings({ "rawtypes", "unchecked" })
+	@SuppressWarnings("unchecked")
 	void createJob_writesOutbox_andSyncsToElasticsearch() throws Exception {
 		User employer = newEmployer();
 		Job job = jobService.createJob(sampleJob(), employer.getId());

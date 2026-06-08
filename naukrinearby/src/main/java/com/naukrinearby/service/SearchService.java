@@ -7,6 +7,7 @@ import java.util.Map;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch.core.search.Hit;
+import co.elastic.clients.elasticsearch.core.search.TotalHits;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.naukrinearby.config.SearchProperties;
 import com.naukrinearby.model.dto.search.SearchQuery;
@@ -112,7 +113,8 @@ public class SearchService {
 		for (Hit<Map> hit : resp.hits().hits()) {
 			items.add(toItem(hit.source(), distanceOf(hit, query)));
 		}
-		long total = resp.hits().total() != null ? resp.hits().total().value() : items.size();
+		TotalHits totalHits = resp.hits().total();
+		long total = totalHits != null ? totalHits.value() : items.size();
 		return new SearchResponse(items, (int) total, "elasticsearch", false);
 	}
 

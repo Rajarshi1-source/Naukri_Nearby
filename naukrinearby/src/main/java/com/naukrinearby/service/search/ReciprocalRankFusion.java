@@ -21,7 +21,7 @@ public final class ReciprocalRankFusion {
 		for (List<Long> list : rankedLists) {
 			for (int rank = 0; rank < list.size(); rank++) {
 				Long id = list.get(rank);
-				scores.merge(id, 1.0 / (k + rank + 1), Double::sum);
+				scores.merge(id, 1.0 / (k + rank + 1), (a, b) -> a + b);
 			}
 		}
 		return scores.entrySet().stream()
