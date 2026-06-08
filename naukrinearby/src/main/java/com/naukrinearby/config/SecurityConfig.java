@@ -3,6 +3,7 @@ package com.naukrinearby.config;
 import java.time.Duration;
 import java.util.List;
 
+import com.naukrinearby.security.ApiRateLimitFilter;
 import com.naukrinearby.security.JwtAuthFilter;
 
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
 	private final JwtAuthFilter jwtAuthFilter;
+	private final ApiRateLimitFilter apiRateLimitFilter;
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -47,6 +49,7 @@ public class SecurityConfig {
 						.requestMatchers("/api/candidate/**").hasRole("CANDIDATE")
 						.anyRequest().authenticated())
 				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
+				.addFilterAfter(apiRateLimitFilter, JwtAuthFilter.class)
 				.exceptionHandling(e -> e
 						.authenticationEntryPoint((req, res, ex) ->
 								res.sendError(HttpStatus.UNAUTHORIZED.value()))

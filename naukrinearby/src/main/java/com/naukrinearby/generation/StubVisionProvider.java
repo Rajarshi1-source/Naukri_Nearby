@@ -1,14 +1,17 @@
 package com.naukrinearby.generation;
 
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * Placeholder OCR. A real implementation (a vision LLM or Google Vision / Tesseract) can replace
- * this behind {@link VisionProvider}. The MVP focuses LLM spend on text extraction; image OCR is stubbed.
+ * Placeholder OCR. The real {@link LlmVisionProvider} replaces this when
+ * {@code naukri.vision.provider=llm}; the stub stays the default. The MVP focuses LLM spend on text
+ * extraction; image OCR is stubbed.
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "naukri.vision.provider", havingValue = "stub", matchIfMissing = true)
 public class StubVisionProvider implements VisionProvider {
 
 	@Override

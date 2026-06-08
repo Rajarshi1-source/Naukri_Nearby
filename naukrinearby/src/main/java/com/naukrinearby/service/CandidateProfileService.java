@@ -3,6 +3,7 @@ package com.naukrinearby.service;
 import java.time.Instant;
 import java.util.List;
 
+import com.naukrinearby.model.dto.ProfileUpdateRequest;
 import com.naukrinearby.model.dto.ResumeParseResult;
 import com.naukrinearby.model.entity.CandidateProfile;
 import com.naukrinearby.repository.CandidateProfileRepository;
@@ -17,6 +18,7 @@ public class CandidateProfileService {
 
 	private final CandidateProfileRepository profileRepo;
 	private final EmbeddingService embeddingService;
+	private final GeocodingService geocodingService;
 
 	/** Upserts the candidate's profile from an extracted resume, then writes the skill embedding. */
 	@Transactional
@@ -64,6 +66,42 @@ public class CandidateProfileService {
 	@Transactional(readOnly = true)
 	public CandidateProfile getByUserId(Long userId) {
 		return profileRepo.findByUserId(userId).orElse(null);
+	}
+
+	/** Applies a manual profile edit (creates the profile if none exists). Skills stay resume-owned. */
+	@Transactional
+	public CandidateProfile updateProfile(Long userId, ProfileUpdateRequest req) {
+		CandidateProfile profile = profileRepo.findByUserId(userId).orElseGet(() -> {
+			CandidateProfile p = new CandidateProfile();
+			p.setUserId(userId);
+			return p;
+		});
+		if (req.name() != null) {
+			profile.setName(req.name());
+		}
+		if (req.email() != null) {
+			profile.setEmail(req.email());
+		}
+		if (req.city() != null) {
+			profile.setCity(req.city());
+		}
+		if (req.state() != null) {
+			profile.setState(req.state());
+		}
+		if (req.lat() != null && req.lng() != null) {
+			profile.setLocation(geocodingService.validateAndBuild(req.lat(), req.lng()));
+		}
+		if (req.preferredRadiusKm() != null) {
+			profile.setPreferredRadiusKm(geocodingService.clampRadiusKm(req.preferredRadiusKm()));
+		}
+		if (req.preferredCategories() != null) {
+			profile.setPreferredCategories(req.preferredCategories().toArray(new String[0]));
+		}
+		if (req.languagesSpoken() != null && !req.languagesSpoken().isEmpty()) {
+			profile.setLanguagesSpoken(req.languagesSpoken().toArray(new String[0]));
+		}
+		profile.setProfileCompleteness(completeness(profile));
+		return profileRepo.save(profile);
 	}
 
 	private static String skillText(ResumeParseResult r) {

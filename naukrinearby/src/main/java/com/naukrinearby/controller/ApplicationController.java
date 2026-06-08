@@ -1,10 +1,12 @@
 package com.naukrinearby.controller;
 
 import com.naukrinearby.model.dto.application.ApplicationResponse;
+import com.naukrinearby.model.dto.application.ApplicationStatusUpdateRequest;
 import com.naukrinearby.model.dto.application.ApplyRequest;
 import com.naukrinearby.security.AuthPrincipal;
 import com.naukrinearby.service.ApplicationService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -12,6 +14,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -47,5 +50,14 @@ public class ApplicationController {
 			@AuthenticationPrincipal AuthPrincipal principal) {
 		return applicationService.applicantsForJob(jobId, principal.id(), pageable)
 				.map(ApplicationResponse::from);
+	}
+
+	@PatchMapping("/api/applications/{id}/status")
+	@PreAuthorize("hasRole('EMPLOYER')")
+	public ApplicationResponse updateStatus(@PathVariable("id") Long applicationId,
+			@Valid @RequestBody ApplicationStatusUpdateRequest req,
+			@AuthenticationPrincipal AuthPrincipal principal) {
+		return ApplicationResponse.from(
+				applicationService.updateStatus(applicationId, principal.id(), req.status()));
 	}
 }

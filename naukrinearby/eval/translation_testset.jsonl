@@ -1,0 +1,3 @@
+{"id": "tr-hi-newjob", "text": "New job near you: Plumber. Apply on NaukriNearby.", "target_language": "hi", "expected_contains": []}
+{"id": "tr-ta-salary", "text": "Salary: Rs.15000-20000/month.", "target_language": "ta", "expected_contains": []}
+{"id": "tr-en-noop", "text": "Apply on NaukriNearby.", "target_language": "en", "expected_contains": ["Apply on NaukriNearby."]}

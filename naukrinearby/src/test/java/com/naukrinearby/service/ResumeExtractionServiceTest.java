@@ -2,6 +2,7 @@ package com.naukrinearby.service;
 
 import java.util.List;
 
+import com.naukrinearby.config.EvalProperties;
 import com.naukrinearby.generation.LlmExtractionProvider;
 import com.naukrinearby.model.dto.ResumeParseResult;
 import com.naukrinearby.util.PromptLoader;
@@ -36,7 +37,8 @@ class ResumeExtractionServiceTest {
 			}
 		};
 
-		ResumeExtractionService service = new ResumeExtractionService(fakeLlm, new PromptLoader());
+		ResumeExtractionService service = new ResumeExtractionService(fakeLlm, new PromptLoader(),
+				new EvalProperties(false, null, false));
 		ResumeParseResult result = service.extract("Suresh, Tally accountant, 3 saal");
 
 		assertThat(result.getPhone()).isEqualTo("9876543210");

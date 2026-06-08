@@ -8,6 +8,7 @@ public record TwilioProperties(
 		String accountSid,
 		String authToken,
 		String whatsappFrom,
+		String verifyServiceSid,
 		String publicWebhookUrl) {
 
 	public TwilioProperties {

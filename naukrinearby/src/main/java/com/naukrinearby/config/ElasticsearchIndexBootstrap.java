@@ -26,6 +26,24 @@ public class ElasticsearchIndexBootstrap {
 	private static final String INDEX_TEMPLATE = """
 			{
 			  "aliases": { "%s": {} },
+			  "settings": {
+			    "analysis": {
+			      "filter": {
+			        "hindi_stop":     { "type": "stop", "stopwords": "_hindi_" },
+			        "hindi_stemmer":  { "type": "stemmer", "language": "hindi" },
+			        "indic_norm":     { "type": "indic_normalization" },
+			        "hindi_norm":     { "type": "hindi_normalization" }
+			      },
+			      "analyzer": {
+			        "hindi": {
+			          "type": "custom",
+			          "tokenizer": "standard",
+			          "filter": ["lowercase", "decimal_digit", "indic_norm", "hindi_norm",
+			                     "hindi_stop", "hindi_stemmer"]
+			        }
+			      }
+			    }
+			  },
 			  "mappings": {
 			    "properties": {
 			      "id":          { "type": "long" },

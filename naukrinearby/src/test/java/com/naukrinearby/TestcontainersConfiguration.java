@@ -1,11 +1,14 @@
 package com.naukrinearby;
 
 import java.nio.file.Path;
+import java.time.Duration;
 
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.test.context.DynamicPropertyRegistrar;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.wait.strategy.Wait;
 import org.testcontainers.elasticsearch.ElasticsearchContainer;
 import org.testcontainers.images.builder.ImageFromDockerfile;
 import org.testcontainers.postgresql.PostgreSQLContainer;
@@ -39,6 +42,28 @@ class TestcontainersConfiguration {
 	@ServiceConnection(name = "redis")
 	GenericContainer<?> redisContainer() {
 		return new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+	}
+
+	@Bean
+	GenericContainer<?> minioContainer() {
+		return new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
+				.withExposedPorts(9000)
+				.withEnv("MINIO_ROOT_USER", "minioadmin")
+				.withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
+				.withCommand("server", "/data")
+				.waitingFor(Wait.forHttp("/minio/health/ready").forPort(9000)
+						.withStartupTimeout(Duration.ofSeconds(60)));
+	}
+
+	/** MinIO has no @ServiceConnection support, so wire its endpoint/credentials dynamically. */
+	@Bean
+	DynamicPropertyRegistrar minioProperties(GenericContainer<?> minioContainer) {
+		return registry -> {
+			registry.add("naukri.storage.endpoint",
+					() -> "http://" + minioContainer.getHost() + ":" + minioContainer.getMappedPort(9000));
+			registry.add("naukri.storage.access-key", () -> "minioadmin");
+			registry.add("naukri.storage.secret-key", () -> "minioadmin");
+		};
 	}
 
 }

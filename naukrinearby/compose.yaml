@@ -62,8 +62,62 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Observability stack (master plan §16). Scrapes the app's Actuator/Prometheus endpoint. ---
+  prometheus:
+    image: 'prom/prometheus:v2.54.1'
+    profiles: ['observability']
+    ports:
+      - '9090:9090'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
+  grafana:
+    image: 'grafana/grafana:11.2.0'
+    profiles: ['observability']
+    ports:
+      - '3001:3000'
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+  # --- LLM observability (Langfuse) — traces resume-extraction calls. Needs its own Postgres. ---
+  langfuse-db:
+    image: 'postgres:16-alpine'
+    profiles: ['observability']
+    environment:
+      - POSTGRES_DB=langfuse
+      - POSTGRES_USER=langfuse
+      - POSTGRES_PASSWORD=langfuse
+    volumes:
+      - langfuse_db_data:/var/lib/postgresql/data
+
+  langfuse:
+    image: 'langfuse/langfuse:2'
+    profiles: ['observability']
+    ports:
+      - '3002:3000'
+    environment:
+      - DATABASE_URL=postgresql://langfuse:langfuse@langfuse-db:5432/langfuse
+      - NEXTAUTH_URL=http://localhost:3002
+      - NEXTAUTH_SECRET=change-me-langfuse
+      - SALT=change-me-salt
+      - TELEMETRY_ENABLED=false
+    depends_on:
+      - langfuse-db
+
 volumes:
   postgres_data:
   redis_data:
   es_data:
   minio_data:
+  grafana_data:
+  langfuse_db_data:

@@ -1,0 +1,65 @@
+# API deployment: stateless request-serving pods. Workers are disabled here via the `api` profile
+# (see OutboxSyncWorker/NotificationScheduler @Profile("!api")), so API and workers scale independently.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: naukrinearby-api
+  labels: { app: naukrinearby, tier: api }
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: naukrinearby, tier: api }
+  template:
+    metadata:
+      labels: { app: naukrinearby, tier: api }
+    spec:
+      containers:
+        - name: api
+          image: naukrinearby/app:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "api"
+          envFrom:
+            - configMapRef: { name: naukrinearby-config }
+            - secretRef: { name: naukrinearby-secrets }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          resources:
+            requests: { cpu: "500m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: naukrinearby-api
+spec:
+  selector: { app: naukrinearby, tier: api }
+  ports:
+    - port: 80
+      targetPort: 8080
+---
+# Scale API on CPU; request volume is the dominant driver for the stateless tier.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: naukrinearby-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: naukrinearby-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 70 }

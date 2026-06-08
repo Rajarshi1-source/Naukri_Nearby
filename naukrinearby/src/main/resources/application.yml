@@ -39,14 +39,49 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics
+        include: health,info,prometheus,metrics,circuitbreakers,circuitbreakerevents,retries
   endpoint:
     health:
       probes:
         enabled: true
+      show-details: always
   metrics:
     tags:
       application: ${spring.application.name}
+
+# Resilience4j: circuit breakers + retry-with-backoff for external calls (master plan §12).
+# Timeouts are set on each provider's RestClient (LLM 60s, Twilio 10s, Bhashini 10s, embeddings 30s);
+# Elasticsearch (3s socket timeout) degrades to a PostGIS fallback in SearchService.
+resilience4j:
+  circuitbreaker:
+    configs:
+      default:
+        registerHealthIndicator: true
+        slidingWindowType: COUNT_BASED
+        slidingWindowSize: 20
+        minimumNumberOfCalls: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 30s
+        permittedNumberOfCallsInHalfOpenState: 5
+        automaticTransitionFromOpenToHalfOpenEnabled: true
+    instances:
+      llm: { baseConfig: default }
+      bhashini: { baseConfig: default }
+      twilio: { baseConfig: default }
+      embedding: { baseConfig: default }
+      elasticsearch: { baseConfig: default }
+  retry:
+    configs:
+      default:
+        maxAttempts: 3
+        waitDuration: 500ms
+        enableExponentialBackoff: true
+        exponentialBackoffMultiplier: 2.0
+    instances:
+      llm: { baseConfig: default }
+      bhashini: { baseConfig: default }
+      twilio: { baseConfig: default }
+      embedding: { baseConfig: default }
 
 naukri:
   jwt:
@@ -70,6 +105,8 @@ naukri:
     api-key: ${LLM_API_KEY:}
     temperature: 0.0
     timeout: 60s
+  vision:
+    provider: ${VISION_PROVIDER:stub}
   embedding:
     provider: ${EMBEDDING_PROVIDER:local}
     model: ${EMBEDDING_MODEL:bge-m3}
@@ -80,22 +117,30 @@ naukri:
     provider: ${TRANSLATION_PROVIDER:stub}
     base-url: ${BHASHINI_BASE_URL:}
     api-key: ${BHASHINI_API_KEY:}
+    timeout: 10s
   twilio:
     provider: ${TWILIO_PROVIDER:stub}
     account-sid: ${TWILIO_ACCOUNT_SID:}
     auth-token: ${TWILIO_AUTH_TOKEN:}
     whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+14155238886}
+    verify-service-sid: ${TWILIO_VERIFY_SERVICE_SID:}
     public-webhook-url: ${TWILIO_WEBHOOK_URL:http://localhost:8080/api/webhooks/twilio}
   storage:
     endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${MINIO_ACCESS_KEY:minioadmin}
     secret-key: ${MINIO_SECRET_KEY:minioadmin}
     bucket: ${MINIO_BUCKET:resumes}
+    encryption: ${STORAGE_ENCRYPTION:none}
     signed-url-ttl: 15m
+  ratelimit:
+    api-per-minute: ${API_RATE_LIMIT_PER_MINUTE:100}
   search:
     index: jobs
     cache-ttl: 5m
     max-results: 20
+    ranking: ${SEARCH_RANKING:geo}
+    rrf-window: 50
+    rrf-k: 60
   notification:
     daily-limit: 3
     match-threshold: 0.6
@@ -109,6 +154,9 @@ naukri:
     min-lng: 68.0
     max-lng: 97.5
     max-radius-km: 100
+    geocoder: ${GEOCODER:none}
+    geocoder-base-url: ${GEOCODER_BASE_URL:https://nominatim.openstreetmap.org}
   eval:
     enabled: ${EVAL_ENABLED:false}
     api-key: ${EVAL_API_KEY:}
+    trace-enabled: ${EVAL_TRACE_ENABLED:false}

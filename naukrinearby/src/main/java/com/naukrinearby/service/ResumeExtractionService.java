@@ -5,18 +5,22 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.naukrinearby.config.EvalProperties;
 import com.naukrinearby.generation.LlmExtractionProvider;
 import com.naukrinearby.model.dto.ResumeParseResult;
 import com.naukrinearby.util.PromptLoader;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
  * Injects the resume into the versioned prompt, calls the provider-agnostic LLM adapter at
  * temperature 0, then post-processes deterministically (eval connectors §4). This is what the
- * eval harness exercises end-to-end.
+ * eval harness exercises end-to-end. When {@code naukri.eval.trace-enabled=true} a Langfuse-style
+ * structured trace (provider, prompt version, latency, JSON validity) is logged per parse.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ResumeExtractionService {
@@ -26,15 +30,31 @@ public class ResumeExtractionService {
 
 	private final LlmExtractionProvider llm;
 	private final PromptLoader promptLoader;
+	private final EvalProperties evalProps;
 
 	public ResumeParseResult extract(String resumeText) {
 		String prompt = promptLoader.load(PROMPT_VERSION)
 				.replace("{{RESUME_TEXT}}", resumeText == null ? "" : resumeText.trim());
 
-		ResumeParseResult result = llm.extractStructured(prompt, ResumeParseResult.class, PROMPT_VERSION);
-		postProcess(result);
-		result.setPromptVersion(PROMPT_VERSION);
-		return result;
+		long start = System.currentTimeMillis();
+		boolean valid = false;
+		try {
+			ResumeParseResult result = llm.extractStructured(prompt, ResumeParseResult.class, PROMPT_VERSION);
+			postProcess(result);
+			result.setPromptVersion(PROMPT_VERSION);
+			valid = true;
+			return result;
+		}
+		finally {
+			trace(start, valid);
+		}
+	}
+
+	private void trace(long startMs, boolean jsonValid) {
+		if (evalProps.traceEnabled()) {
+			log.info("llm_trace provider={} promptVersion={} latencyMs={} jsonValid={}",
+					llm.providerId(), PROMPT_VERSION, System.currentTimeMillis() - startMs, jsonValid);
+		}
 	}
 
 	/** Deterministic server-side cleanup so the eval (and prod) get consistent output. */

@@ -1,0 +1,57 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "schemaVersion": 39,
+  "title": "NaukriNearby — KPIs",
+  "tags": ["naukrinearby"],
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Search latency (avg, s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(search_duration_seconds_sum[5m]) / clamp_min(rate(search_duration_seconds_count[5m]), 1)",
+          "legendFormat": "avg search latency"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Resume parse latency (avg, s)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(resume_parse_duration_seconds_sum[5m]) / clamp_min(rate(resume_parse_duration_seconds_count[5m]), 1)",
+          "legendFormat": "avg parse latency"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "WhatsApp alerts sent (per min)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "60 * rate(notifications_sent_total[5m])",
+          "legendFormat": "{{channel}}"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Notification queue depth",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        { "expr": "notification_queue_depth", "legendFormat": "queue" },
+        { "expr": "notification_dlq_depth", "legendFormat": "dlq" }
+      ]
+    }
+  ]
+}

@@ -12,14 +12,20 @@ import io.minio.GetPresignedObjectUrlArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
+import io.minio.ServerSideEncryptionS3;
 import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
  * Resume object storage on MinIO (S3-compatible). Resumes are PII (DPDP Act) — access is via
- * short-lived signed URLs only; we never serve raw bytes publicly (security-and-api.md §C).
+ * short-lived signed URLs only; we never serve raw bytes publicly (security-and-api.md §C). With
+ * {@code naukri.storage.encryption=sse} objects are written with SSE-S3 (encryption at rest); GETs
+ * via signed URL stay transparent because the server decrypts. Requires MinIO to run with a KMS key.
  */
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class FileStorageService {
@@ -33,12 +39,15 @@ public class FileStorageService {
 		ensureBucket();
 		String key = "resumes/" + UUID.randomUUID() + extension(originalFilename);
 		try (var stream = new ByteArrayInputStream(content)) {
-			minio.putObject(PutObjectArgs.builder()
+			PutObjectArgs.Builder builder = PutObjectArgs.builder()
 					.bucket(props.bucket())
 					.object(key)
 					.stream(stream, content.length, -1)
-					.contentType(contentType == null ? "application/octet-stream" : contentType)
-					.build());
+					.contentType(contentType == null ? "application/octet-stream" : contentType);
+			if (props.sseEnabled()) {
+				builder.sse(new ServerSideEncryptionS3());
+			}
+			minio.putObject(builder.build());
 			return key;
 		}
 		catch (Exception ex) {
@@ -55,6 +64,22 @@ public class FileStorageService {
 		}
 		catch (Exception ex) {
 			throw new IllegalStateException("Failed to download resume from storage", ex);
+		}
+	}
+
+	/** Right-to-erasure (DPDP): permanently removes a resume object. Missing keys are ignored. */
+	public void delete(String key) {
+		if (key == null || key.isBlank()) {
+			return;
+		}
+		try {
+			minio.removeObject(RemoveObjectArgs.builder()
+					.bucket(props.bucket())
+					.object(key)
+					.build());
+		}
+		catch (Exception ex) {
+			log.warn("Failed to delete resume object {}: {}", key, ex.getMessage());
 		}
 	}
 

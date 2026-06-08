@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Optional;
 
 import com.naukrinearby.model.entity.Job;
+import com.naukrinearby.model.enums.JobStatus;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +21,10 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
 	@EntityGraph(attributePaths = "employer")
 	Page<Job> findByEmployer_IdOrderByCreatedAtDesc(Long employerId, Pageable pageable);
+
+	long countByEmployer_Id(Long employerId);
+
+	long countByEmployer_IdAndStatus(Long employerId, JobStatus status);
 
 	/** PostGIS hyperlocal search — also the Elasticsearch-down fallback (master plan §9.6). */
 	@Query(value = """
@@ -51,6 +56,27 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 			LIMIT :limit
 			""", nativeQuery = true)
 	List<Object[]> findRecommendedForCandidate(@Param("userId") Long userId, @Param("limit") int limit);
+
+	/** Active jobs ranked by pgvector cosine distance to a query vector (hybrid search BM25+vector leg). */
+	@Query(value = """
+			SELECT j.id FROM jobs j
+			WHERE j.status = 'ACTIVE' AND j.requirement_vector IS NOT NULL
+			ORDER BY j.requirement_vector <=> CAST(:vec AS vector) ASC
+			LIMIT :limit
+			""", nativeQuery = true)
+	List<Long> findIdsBySimilarity(@Param("vec") String vec, @Param("limit") int limit);
+
+	/** Same as {@link #findIdsBySimilarity} but constrained to a geo radius (hyperlocal hybrid search). */
+	@Query(value = """
+			SELECT j.id FROM jobs j
+			WHERE j.status = 'ACTIVE' AND j.requirement_vector IS NOT NULL
+			  AND j.location IS NOT NULL
+			  AND ST_DWithin(j.location, ST_MakePoint(:lng, :lat)::geography, :radiusM)
+			ORDER BY j.requirement_vector <=> CAST(:vec AS vector) ASC
+			LIMIT :limit
+			""", nativeQuery = true)
+	List<Long> findIdsBySimilarityWithinRadius(@Param("vec") String vec, @Param("lat") double lat,
+			@Param("lng") double lng, @Param("radiusM") double radiusM, @Param("limit") int limit);
 
 	/** Writes the pgvector requirement vector via a text->vector cast (column is not JPA-mapped). */
 	@Modifying

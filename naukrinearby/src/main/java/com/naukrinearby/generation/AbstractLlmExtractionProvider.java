@@ -3,12 +3,16 @@ package com.naukrinearby.generation;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.naukrinearby.exception.ResumeParseException;
 
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 /**
  * Base class doing the JSON-mode call contract, defensive fence-stripping, and Jackson mapping
  * (eval connectors §6). Concrete providers implement only the raw model call (temperature 0 + JSON).
+ * The public entry point is guarded by a Resilience4j retry + circuit breaker (master plan §12); on an
+ * open breaker the call throws and the caller (e.g. ResumeParserService) records a FAILED parse.
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -20,6 +24,8 @@ public abstract class AbstractLlmExtractionProvider implements LlmExtractionProv
 	protected abstract String callModelRaw(String prompt);
 
 	@Override
+	@Retry(name = "llm")
+	@CircuitBreaker(name = "llm")
 	public <T> T extractStructured(String prompt, Class<T> schema, String promptVersion) {
 		long start = System.currentTimeMillis();
 		String raw = callModelRaw(prompt);

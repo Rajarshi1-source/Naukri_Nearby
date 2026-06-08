@@ -1,0 +1,3 @@
+{"id": "match-plumber-blr", "query": {"query": "plumber pipe repair", "lat": 12.9716, "lng": 77.5946, "radius_km": 10, "size": 10}, "relevant_ids": []}
+{"id": "match-electrician-del", "query": {"query": "electrician wiring", "lat": 28.6139, "lng": 77.2090, "radius_km": 15, "size": 10}, "relevant_ids": []}
+{"id": "match-delivery-mum", "query": {"query": "delivery two wheeler", "lat": 19.0760, "lng": 72.8777, "radius_km": 8, "size": 10}, "relevant_ids": []}

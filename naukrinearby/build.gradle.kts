@@ -41,6 +41,11 @@ dependencies {
 	implementation("org.apache.pdfbox:pdfbox:3.0.7")
 	implementation("io.minio:minio:8.5.17")
 
+	// Resilience: circuit breakers + retry + metrics for external calls (LLM/Twilio/Bhashini/embeddings).
+	// Boot 4 needs the dedicated spring-boot4 module; pinned because it is omitted from resilience4j-bom.
+	implementation("io.github.resilience4j:resilience4j-spring-boot4:2.4.0")
+	implementation("org.springframework:spring-aspects")
+
 	compileOnly("org.projectlombok:lombok")
 	developmentOnly("org.springframework.boot:spring-boot-devtools")
 	developmentOnly("org.springframework.boot:spring-boot-docker-compose")

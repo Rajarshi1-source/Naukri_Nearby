@@ -1,6 +1,7 @@
 package com.naukrinearby.service.otp;
 
 import com.naukrinearby.config.OtpProperties;
+import com.naukrinearby.util.PiiRedactor;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,7 +22,7 @@ public class StubOtpProvider implements OtpProvider {
 
 	@Override
 	public void send(String phone) {
-		log.info("[OTP stub] code for {} is {}", mask(phone), props.devCode());
+		log.info("[OTP stub] code for {} is {}", PiiRedactor.maskPhone(phone), props.devCode());
 	}
 
 	@Override
@@ -32,12 +33,5 @@ public class StubOtpProvider implements OtpProvider {
 	@Override
 	public String providerId() {
 		return "stub";
-	}
-
-	private static String mask(String phone) {
-		if (phone == null || phone.length() < 4) {
-			return "****";
-		}
-		return phone.substring(0, 2) + "XXXX" + phone.substring(phone.length() - 2);
 	}
 }

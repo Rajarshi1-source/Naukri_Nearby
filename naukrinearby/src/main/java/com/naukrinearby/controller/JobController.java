@@ -1,10 +1,12 @@
 package com.naukrinearby.controller;
 
+import com.naukrinearby.model.dto.DashboardStatsDTO;
 import com.naukrinearby.model.dto.job.JobCreateRequest;
 import com.naukrinearby.model.dto.job.JobResponse;
 import com.naukrinearby.model.dto.job.JobStatusUpdateRequest;
 import com.naukrinearby.model.dto.job.JobUpdateRequest;
 import com.naukrinearby.security.AuthPrincipal;
+import com.naukrinearby.service.DashboardService;
 import com.naukrinearby.service.JobService;
 
 import jakarta.validation.Valid;
@@ -28,6 +30,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class JobController {
 
 	private final JobService jobService;
+	private final DashboardService dashboardService;
 
 	@PostMapping("/api/jobs")
 	@PreAuthorize("hasRole('EMPLOYER')")
@@ -56,5 +59,11 @@ public class JobController {
 	@PreAuthorize("hasRole('EMPLOYER')")
 	public Page<JobResponse> myJobs(Pageable pageable, @AuthenticationPrincipal AuthPrincipal principal) {
 		return jobService.employerJobs(principal.id(), pageable).map(JobResponse::from);
+	}
+
+	@GetMapping("/api/employer/dashboard/stats")
+	@PreAuthorize("hasRole('EMPLOYER')")
+	public DashboardStatsDTO dashboardStats(@AuthenticationPrincipal AuthPrincipal principal) {
+		return dashboardService.employerStats(principal.id());
 	}
 }

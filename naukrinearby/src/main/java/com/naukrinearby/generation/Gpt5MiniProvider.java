@@ -38,47 +38,24 @@ public class Gpt5MiniProvider extends AbstractLlmExtractionProvider {
 				.build();
 	}
 
-	private static final int MAX_ATTEMPTS = 3;
-
 	@Override
 	protected String callModelRaw(String prompt) {
+		// Retry + circuit breaking are applied by Resilience4j on the public extractStructured(...)
+		// entry point (see AbstractLlmExtractionProvider); this method does a single HTTP call.
 		Map<String, Object> body = Map.of(
 				"model", props.extractionModel(),
 				"temperature", props.temperature(),
 				"response_format", Map.of("type", "json_object"),
 				"messages", List.of(Map.of("role", "user", "content", prompt)));
-
-		// Retry with exponential backoff on transient failures (timeouts / 5xx / network).
-		RuntimeException last = null;
-		for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-			try {
-				ChatResponse response = client.post()
-						.uri("/chat/completions")
-						.body(body)
-						.retrieve()
-						.body(ChatResponse.class);
-				if (response == null || response.choices() == null || response.choices().isEmpty()) {
-					throw new ResumeParseException("Empty response from LLM");
-				}
-				return response.choices().get(0).message().content();
-			}
-			catch (RuntimeException ex) {
-				last = ex;
-				if (attempt < MAX_ATTEMPTS) {
-					sleep(200L * (1L << (attempt - 1)));
-				}
-			}
+		ChatResponse response = client.post()
+				.uri("/chat/completions")
+				.body(body)
+				.retrieve()
+				.body(ChatResponse.class);
+		if (response == null || response.choices() == null || response.choices().isEmpty()) {
+			throw new ResumeParseException("Empty response from LLM");
 		}
-		throw new ResumeParseException("LLM call failed after " + MAX_ATTEMPTS + " attempts", last);
-	}
-
-	private static void sleep(long ms) {
-		try {
-			Thread.sleep(ms);
-		}
-		catch (InterruptedException ie) {
-			Thread.currentThread().interrupt();
-		}
+		return response.choices().get(0).message().content();
 	}
 
 	@Override

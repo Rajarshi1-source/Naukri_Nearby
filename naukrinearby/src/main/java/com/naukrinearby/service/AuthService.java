@@ -81,6 +81,18 @@ public class AuthService {
 		return userRepo.findById(id).orElseThrow(() -> new ValidationException("Unknown user"));
 	}
 
+	/** Finds or creates a verified candidate by phone — used by the WhatsApp-first apply flow. */
+	@Transactional
+	public User getOrCreateCandidate(String normalizedPhone) {
+		User user = userRepo.findByPhone(normalizedPhone)
+				.orElseGet(() -> createUser(normalizedPhone, UserRole.CANDIDATE));
+		if (!user.isVerified()) {
+			user.setVerified(true);
+			userRepo.save(user);
+		}
+		return user;
+	}
+
 	private User createUser(String phone, UserRole role) {
 		User user = userRepo.save(new User(phone, role));
 		if (role == UserRole.EMPLOYER) {

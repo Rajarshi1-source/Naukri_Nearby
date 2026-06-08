@@ -15,6 +15,7 @@ import com.naukrinearby.repository.OutboxRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.annotation.Profile;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,9 +24,14 @@ import org.springframework.transaction.annotation.Transactional;
  * Drains the transactional outbox into Elasticsearch with an idempotent, version-guarded upsert on
  * {@code job_id} (starter §1.4). At-least-once delivery + idempotent upsert = effectively-once.
  * Survives ES downtime: events stay PENDING and drain on recovery.
+ *
+ * <p>{@code @Profile("!api")}: runs everywhere except the API-only deployment (master §17 scaling
+ * decision). The default single-process app and the dedicated worker deployment both run it; only a
+ * pod started with {@code SPRING_PROFILES_ACTIVE=api} skips it, letting API and workers scale apart.
  */
 @Slf4j
 @Component
+@Profile("!api")
 @RequiredArgsConstructor
 public class OutboxSyncWorker {
 

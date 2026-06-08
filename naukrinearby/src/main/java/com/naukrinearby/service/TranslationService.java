@@ -7,10 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 /**
- * Translation with graceful degradation (master plan §9, mitigation §13): if the provider fails or
- * times out, we fall back to the original English text rather than dropping the alert. (The skill's
- * Resilience4j {@code @CircuitBreaker} maps onto this try/fallback; native circuit breakers aren't
- * yet packaged for Spring Boot 4, so the fallback is implemented explicitly — see AGENTS.md.)
+ * Translation with graceful degradation (master plan §9, mitigation §13): if the provider fails,
+ * times out, or its Resilience4j circuit breaker is open, we fall back to the original English text
+ * rather than dropping the alert. The real {@code BhashiniTranslationProvider} carries the
+ * {@code @CircuitBreaker(name="bhashini")} + {@code @Retry}; this outer try/catch is the final net.
  */
 @Slf4j
 @Service

@@ -14,6 +14,7 @@ import com.naukrinearby.model.dto.search.SearchResponse;
 import com.naukrinearby.model.dto.search.SearchResultItem;
 import com.naukrinearby.model.entity.Job;
 import com.naukrinearby.repository.JobRepository;
+import com.naukrinearby.service.search.HybridSearchStrategy;
 import com.naukrinearby.service.search.SearchRankingStrategy;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -37,6 +38,7 @@ public class SearchService {
 	private final ElasticsearchClient es;
 	private final JobRepository jobRepo;
 	private final SearchRankingStrategy rankingStrategy;
+	private final HybridSearchStrategy hybridSearchStrategy;
 	private final SearchProperties props;
 	private final StringRedisTemplate redis;
 	private final ObjectMapper objectMapper;
@@ -64,7 +66,8 @@ public class SearchService {
 			}
 		}
 		try {
-			SearchResponse result = searchElasticsearch(query);
+			boolean useHybrid = props.hybridEnabled() && query.q() != null && !query.q().isBlank();
+			SearchResponse result = useHybrid ? hybridSearchStrategy.search(query) : searchElasticsearch(query);
 			redis.opsForValue().set(cacheKey, objectMapper.writeValueAsString(result), props.cacheTtl());
 			return result;
 		}

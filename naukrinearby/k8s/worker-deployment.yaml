@@ -1,0 +1,56 @@
+# Worker deployment: runs the outbox->ES sync and the WhatsApp notification consumer. No Service
+# (not request-serving). Uses the `worker` profile; because the workers are @Profile("!api") they are
+# active here. Scale on the Redis queue-depth gauge (notification_queue_depth) via a custom-metrics HPA.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: naukrinearby-worker
+  labels: { app: naukrinearby, tier: worker }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: naukrinearby, tier: worker }
+  template:
+    metadata:
+      labels: { app: naukrinearby, tier: worker }
+    spec:
+      containers:
+        - name: worker
+          image: naukrinearby/app:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "worker"
+            # Each pod must be a distinct Redis Stream consumer so messages aren't double-claimed.
+            - name: NAUKRI_NOTIFICATION_CONSUMER_NAME
+              valueFrom:
+                fieldRef: { fieldPath: metadata.name }
+          envFrom:
+            - configMapRef: { name: naukrinearby-config }
+            - secretRef: { name: naukrinearby-secrets }
+          readinessProbe:
+            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          resources:
+            requests: { cpu: "250m", memory: "512Mi" }
+            limits: { cpu: "1", memory: "1Gi" }
+---
+# Requires a custom-metrics adapter (e.g. prometheus-adapter) exposing notification_queue_depth.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: naukrinearby-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: naukrinearby-worker
+  minReplicas: 1
+  maxReplicas: 5
+  metrics:
+    - type: Pods
+      pods:
+        metric: { name: notification_queue_depth }
+        target: { type: AverageValue, averageValue: "100" }

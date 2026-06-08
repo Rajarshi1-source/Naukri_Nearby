@@ -10,6 +10,7 @@ import com.naukrinearby.service.NotificationService;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Profile;
 import org.springframework.data.redis.connection.stream.Consumer;
 import org.springframework.data.redis.connection.stream.MapRecord;
 import org.springframework.data.redis.connection.stream.ReadOffset;
@@ -22,9 +23,13 @@ import org.springframework.stereotype.Component;
 /**
  * Redis Streams consumer for the WhatsApp alert queue. Reads with a consumer group, delegates each
  * record to {@link NotificationService#process}, acks on success, and routes poison messages to a DLQ.
+ *
+ * <p>{@code @Profile("!api")}: active by default and in the worker deployment; disabled only in the
+ * API-only deployment so the alert consumer can scale independently (master §17).
  */
 @Slf4j
 @Component
+@Profile("!api")
 @RequiredArgsConstructor
 public class NotificationScheduler {
 
