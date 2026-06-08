@@ -62,6 +62,19 @@ services:
       timeout: 5s
       retries: 5
 
+  # --- Next.js frontend (lean MVP). Opt-in via the `frontend` profile. The Spring Boot app runs on
+  # the host (gradle bootRun / bootJar), so the browser reaches it at NEXT_PUBLIC_API_URL. ---
+  frontend:
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8080}
+    profiles: ['frontend']
+    ports:
+      - '3000:3000'
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+
   # --- Observability stack (master plan §16). Scrapes the app's Actuator/Prometheus endpoint. ---
   prometheus:
     image: 'prom/prometheus:v2.54.1'

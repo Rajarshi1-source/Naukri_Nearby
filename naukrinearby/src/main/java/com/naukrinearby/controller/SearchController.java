@@ -39,6 +39,17 @@ public class SearchController {
 		return searchService.search(new SearchQuery(q, lat, lng, radius, category, size));
 	}
 
+	/**
+	 * Personalized recommendations for the signed-in candidate (pgvector + PostGIS). Spec-aligned
+	 * alias of {@code /api/candidate/recommendations}. Declared as a literal path so it takes
+	 * precedence over {@code GET /api/jobs/{slug}} (Spring matches exact paths before path variables).
+	 */
+	@GetMapping("/api/jobs/recommended")
+	@PreAuthorize("hasRole('CANDIDATE')")
+	public List<JobMatch> recommended(@AuthenticationPrincipal AuthPrincipal principal) {
+		return matchingService.recommendedJobs(principal.id());
+	}
+
 	/** Public job detail — read from Postgres (the source of truth). */
 	@GetMapping("/api/jobs/{slug}")
 	public JobResponse detail(@PathVariable String slug) {

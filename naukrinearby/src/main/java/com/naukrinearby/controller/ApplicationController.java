@@ -1,5 +1,6 @@
 package com.naukrinearby.controller;
 
+import com.naukrinearby.model.dto.application.ApplicationCreateRequest;
 import com.naukrinearby.model.dto.application.ApplicationResponse;
 import com.naukrinearby.model.dto.application.ApplicationStatusUpdateRequest;
 import com.naukrinearby.model.dto.application.ApplyRequest;
@@ -35,6 +36,16 @@ public class ApplicationController {
 			@AuthenticationPrincipal AuthPrincipal principal) {
 		String coverNote = req == null ? null : req.coverNote();
 		return ApplicationResponse.from(applicationService.apply(jobId, principal.id(), coverNote));
+	}
+
+	/** Spec-aligned alias for apply (master plan §7.3); delegates to the same idempotent apply logic. */
+	@PostMapping("/api/applications")
+	@PreAuthorize("hasRole('CANDIDATE')")
+	@ResponseStatus(HttpStatus.CREATED)
+	public ApplicationResponse create(@Valid @RequestBody ApplicationCreateRequest req,
+			@AuthenticationPrincipal AuthPrincipal principal) {
+		return ApplicationResponse.from(
+				applicationService.apply(req.jobId(), principal.id(), req.coverNote()));
 	}
 
 	@GetMapping("/api/candidate/applications")

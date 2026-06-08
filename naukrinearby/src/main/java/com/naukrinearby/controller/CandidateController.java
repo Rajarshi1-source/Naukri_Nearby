@@ -1,16 +1,20 @@
 package com.naukrinearby.controller;
 
+import java.util.List;
+
 import com.naukrinearby.exception.NotFoundException;
 import com.naukrinearby.model.dto.CandidateProfileResponse;
 import com.naukrinearby.model.dto.DashboardStatsDTO;
 import com.naukrinearby.model.dto.NotificationPreferenceDto;
 import com.naukrinearby.model.dto.ProfileUpdateRequest;
+import com.naukrinearby.model.dto.job.JobResponse;
 import com.naukrinearby.model.entity.CandidateProfile;
 import com.naukrinearby.security.AuthPrincipal;
 import com.naukrinearby.service.AccountService;
 import com.naukrinearby.service.CandidateProfileService;
 import com.naukrinearby.service.DashboardService;
 import com.naukrinearby.service.NotificationPreferenceService;
+import com.naukrinearby.service.SavedJobService;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -18,6 +22,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -34,6 +40,7 @@ public class CandidateController {
 	private final NotificationPreferenceService preferenceService;
 	private final DashboardService dashboardService;
 	private final AccountService accountService;
+	private final SavedJobService savedJobService;
 
 	@GetMapping("/profile")
 	public CandidateProfileResponse profile(@AuthenticationPrincipal AuthPrincipal principal) {
@@ -71,5 +78,23 @@ public class CandidateController {
 	public NotificationPreferenceDto updatePreferences(@RequestBody NotificationPreferenceDto req,
 			@AuthenticationPrincipal AuthPrincipal principal) {
 		return NotificationPreferenceDto.from(preferenceService.update(principal.id(), req));
+	}
+
+	@GetMapping("/saved-jobs")
+	public List<JobResponse> savedJobs(@AuthenticationPrincipal AuthPrincipal principal) {
+		return savedJobService.list(principal.id());
+	}
+
+	/** Save/bookmark a job. Idempotent — re-saving is a no-op. */
+	@PostMapping("/saved-jobs/{jobId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void saveJob(@PathVariable Long jobId, @AuthenticationPrincipal AuthPrincipal principal) {
+		savedJobService.save(principal.id(), jobId);
+	}
+
+	@DeleteMapping("/saved-jobs/{jobId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	public void unsaveJob(@PathVariable Long jobId, @AuthenticationPrincipal AuthPrincipal principal) {
+		savedJobService.unsave(principal.id(), jobId);
 	}
 }

@@ -71,6 +71,95 @@ class ApiEndpointsIntegrationTests {
 				.jsonPath("$.status").isEqualTo("VIEWED");
 	}
 
+	@Test
+	void candidate_appliesViaSpecAlias() {
+		RestTestClient client = client();
+		String employerToken = token(client, nextPhone(), "EMPLOYER");
+		Number jobId = (Number) postJson(client, employerToken, "/api/jobs", jobBody()).get("id");
+
+		String candidateToken = token(client, nextPhone(), "CANDIDATE");
+		// POST /api/applications { jobId, coverNote } — spec-aligned alias of /api/jobs/{id}/apply.
+		client.post().uri("/api/applications")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(Map.of("jobId", jobId, "coverNote", "Applying via alias"))
+				.exchange()
+				.expectStatus().isCreated()
+				.expectBody()
+				.jsonPath("$.jobId").isEqualTo(jobId.intValue());
+
+		// Re-applying is idempotent on UNIQUE(job_id, candidate_id) → 409.
+		client.post().uri("/api/applications")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(Map.of("jobId", jobId))
+				.exchange()
+				.expectStatus().isEqualTo(409);
+	}
+
+	@Test
+	void candidate_notificationPreferences_specAlias() {
+		RestTestClient client = client();
+		String token = token(client, nextPhone(), "CANDIDATE");
+
+		client.get().uri("/api/notifications/preferences")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody()
+				.jsonPath("$.channel").isEqualTo("WHATSAPP");
+
+		client.put().uri("/api/notifications/preferences")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(Map.of("language", "hi", "radiusKm", 25))
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody()
+				.jsonPath("$.language").isEqualTo("hi")
+				.jsonPath("$.radiusKm").isEqualTo(25);
+	}
+
+	@Test
+	void candidate_savedJobs_roundTrip() {
+		RestTestClient client = client();
+		String employerToken = token(client, nextPhone(), "EMPLOYER");
+		Number jobId = (Number) postJson(client, employerToken, "/api/jobs", jobBody()).get("id");
+
+		String candidateToken = token(client, nextPhone(), "CANDIDATE");
+
+		// Save is idempotent: two saves still yield exactly one entry.
+		saveJob(client, candidateToken, jobId);
+		saveJob(client, candidateToken, jobId);
+
+		client.get().uri("/api/candidate/saved-jobs")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody()
+				.jsonPath("$.length()").isEqualTo(1)
+				.jsonPath("$[0].id").isEqualTo(jobId.intValue());
+
+		client.delete().uri("/api/candidate/saved-jobs/" + jobId)
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.exchange()
+				.expectStatus().isNoContent();
+
+		client.get().uri("/api/candidate/saved-jobs")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody()
+				.jsonPath("$.length()").isEqualTo(0);
+	}
+
+	private void saveJob(RestTestClient client, String token, Number jobId) {
+		client.post().uri("/api/candidate/saved-jobs/" + jobId)
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+				.exchange()
+				.expectStatus().isNoContent();
+	}
+
 	private Map<String, Object> jobBody() {
 		Map<String, Object> body = new HashMap<>();
 		body.put("title", "Driver Needed");
