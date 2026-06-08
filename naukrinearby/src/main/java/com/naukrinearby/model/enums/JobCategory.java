@@ -1,0 +1,18 @@
+package com.naukrinearby.model.enums;
+
+public enum JobCategory {
+	DELIVERY,
+	DRIVER,
+	RETAIL,
+	ELECTRICAL,
+	PLUMBING,
+	CONSTRUCTION,
+	ACCOUNTING,
+	DATA_ENTRY,
+	SECURITY,
+	HOUSEKEEPING,
+	COOKING,
+	TAILORING,
+	SALES,
+	OTHER
+}

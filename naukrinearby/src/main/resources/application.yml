@@ -1,0 +1,114 @@
+spring:
+  application:
+    name: naukrinearby
+  threads:
+    virtual:
+      enabled: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/naukrinearby}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres}
+    password: ${SPRING_DATASOURCE_PASSWORD:postgres}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+  data:
+    redis:
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+  elasticsearch:
+    uris: ${SPRING_ELASTICSEARCH_URIS:http://localhost:9200}
+    connection-timeout: 3s
+    socket-timeout: 3s
+  docker:
+    compose:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+naukri:
+  jwt:
+    issuer: naukrinearby
+    access-ttl: 15m
+    refresh-ttl: 30d
+    private-key: ${JWT_PRIVATE_KEY:}
+    public-key: ${JWT_PUBLIC_KEY:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
+  otp:
+    provider: ${OTP_PROVIDER:stub}
+    dev-code: ${OTP_DEV_CODE:123456}
+    ttl: 5m
+    max-per-hour: 5
+  llm:
+    extraction-provider: ${EXTRACTION_PROVIDER:gpt5mini}
+    extraction-model: ${EXTRACTION_MODEL:gpt-5-mini}
+    vision-model: ${VISION_MODEL:gpt-5-mini}
+    base-url: ${LLM_BASE_URL:https://api.openai.com/v1}
+    api-key: ${LLM_API_KEY:}
+    temperature: 0.0
+    timeout: 60s
+  embedding:
+    provider: ${EMBEDDING_PROVIDER:local}
+    model: ${EMBEDDING_MODEL:bge-m3}
+    dims: ${EMBEDDING_DIMS:1024}
+    base-url: ${EMBEDDING_BASE_URL:}
+    api-key: ${EMBEDDING_API_KEY:}
+  translation:
+    provider: ${TRANSLATION_PROVIDER:stub}
+    base-url: ${BHASHINI_BASE_URL:}
+    api-key: ${BHASHINI_API_KEY:}
+  twilio:
+    provider: ${TWILIO_PROVIDER:stub}
+    account-sid: ${TWILIO_ACCOUNT_SID:}
+    auth-token: ${TWILIO_AUTH_TOKEN:}
+    whatsapp-from: ${TWILIO_WHATSAPP_FROM:whatsapp:+14155238886}
+    public-webhook-url: ${TWILIO_WEBHOOK_URL:http://localhost:8080/api/webhooks/twilio}
+  storage:
+    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+    bucket: ${MINIO_BUCKET:resumes}
+    signed-url-ttl: 15m
+  search:
+    index: jobs
+    cache-ttl: 5m
+    max-results: 20
+  notification:
+    daily-limit: 3
+    match-threshold: 0.6
+    stream: notification-jobs
+    dlq-stream: notification-dlq
+    consumer-group: notifiers
+    consumer-name: worker-1
+  geo:
+    min-lat: 6.5
+    max-lat: 37.5
+    min-lng: 68.0
+    max-lng: 97.5
+    max-radius-km: 100
+  eval:
+    enabled: ${EVAL_ENABLED:false}
+    api-key: ${EVAL_API_KEY:}

@@ -1,0 +1,6 @@
+{
+  "skill_f1": 0.85,
+  "city_accuracy": 0.9,
+  "experience_mae": 1.5,
+  "n": 8
+}
