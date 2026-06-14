@@ -7,6 +7,11 @@ even when the skill is not auto-triggered. The skills remain the authoritative s
 ## Stack mandate
 - Backend: Spring Boot 4.0.6 (Spring Framework 7), Java 21 (LTS), Gradle (Kotlin DSL).
   Do NOT generate Spring Boot 3.x or Java 25 code.
+- Frontend: Next.js 16 (App Router), React 19.2, TypeScript strict, on Node.js 24 LTS.
+  Tailwind v4 + shadcn/ui (components copied into the repo). Do NOT generate Next.js 14/15-era
+  code, Pages Router, or synchronous `params`/`searchParams`/`cookies()`/`headers()` access — those
+  request APIs are async Promises in Next.js 16 and must be awaited. Turbopack is the default
+  bundler (no `--turbopack` flag); route gating uses `proxy.ts`, not `middleware.ts`.
 - Datastores: PostgreSQL 16 + PostGIS + pgvector (source of truth, CP), Elasticsearch 8.x
   (derived search index, AP), Redis 7 (cache + Streams + idempotency).
 - Backend module lives in `naukrinearby/`; base package is `com.naukrinearby`.

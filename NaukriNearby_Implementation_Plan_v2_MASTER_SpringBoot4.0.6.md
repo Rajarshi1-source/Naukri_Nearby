@@ -105,7 +105,7 @@ naukri:
 
 | Layer | Technology | Why This (Interview Answer) |
 |---|---|---|
-| **Frontend** | Next.js 14 (App Router) + TypeScript | SSR for SEO (job listings must be Google-indexed). Server components for faster loads on slow Tier-2/3 networks. TS prevents bugs at scale. |
+| **Frontend** | Next.js 16 (App Router) + React 19.2 + TypeScript | SSR for SEO (job listings must be Google-indexed). Server components for faster loads on slow Tier-2/3 networks. TS prevents bugs at scale. Next.js 16 (current stable; 14 is EOL) on Node.js 24 LTS, Turbopack default. |
 | **UI Library** | Tailwind CSS + shadcn/ui | Rapid prototyping; accessible, production-grade components; no CSS bloat. |
 | **Maps** | Leaflet.js (OpenStreetMap) | Free (no Google Maps billing). Excellent India coverage. 42KB vs Google Maps 200KB+ — crucial for slow networks. |
 | **Backend** | Spring Boot 4.0.6 (Java 21) | Dominant in Bangalore product companies. Current Spring generation (Framework 7): virtual threads for concurrent external API calls, `@HttpExchange` HTTP Service Clients for the provider adapters (§2), native `@Retryable`/`@ConcurrencyLimit` + Resilience4j for resilience (§12). Java 21 LTS is fully supported on 4.0.6 (Java 17–26 range). |
@@ -297,7 +297,7 @@ src/main/java/com/naukrinearby/
 └── util/           # GeoUtils, PromptTemplates, PhoneNumberValidator, SlugGenerator
 ```
 
-### 7.2 Frontend Structure (Next.js 14 App Router)
+### 7.2 Frontend Structure (Next.js 16 App Router)
 
 ```
 src/
@@ -853,7 +853,9 @@ ENTRYPOINT ["java","-XX:+UseZGC","-XX:MaxRAMPercentage=75.0","-jar","app.jar"]
 
 **Frontend (multi-stage):**
 ```dockerfile
-FROM node:20-alpine AS build
+# Next.js 16 requires Node 20.9+, but Node 20 is EOL (Apr 2026) — use Node 24 LTS.
+# Turbopack is the default bundler in Next.js 16; `next build` needs no --turbopack flag.
+FROM node:24-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
@@ -861,7 +863,7 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
@@ -1255,7 +1257,7 @@ hyperlocal job discovery to their phones with WhatsApp-first alerts in regional 
 - SEO job pages (Next.js SSR + JSON-LD) · phone+OTP auth
 
 ## Tech Stack
-Next.js 14 · Spring Boot 4.0.6 (Java 21) · PostgreSQL 16 + PostGIS + pgvector ·
+Next.js 16 (React 19.2) · Spring Boot 4.0.6 (Java 21) · PostgreSQL 16 + PostGIS + pgvector ·
 Elasticsearch 8 · Redis 7 · LLM adapter (GPT-5-mini-class) · bge-m3 embeddings ·
 Bhashini · Twilio WhatsApp · Langfuse · Docker · GitHub Actions · Prometheus + Grafana
 
