@@ -3,7 +3,7 @@ package com.naukrinearby.security;
 import java.io.IOException;
 import java.time.Duration;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.util.RedisRateLimiter;
 
 import jakarta.servlet.FilterChain;

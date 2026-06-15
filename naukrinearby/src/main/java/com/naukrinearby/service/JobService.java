@@ -2,7 +2,7 @@ package com.naukrinearby.service;
 
 import java.util.List;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.exception.ForbiddenException;
 import com.naukrinearby.exception.NotFoundException;
 import com.naukrinearby.exception.ValidationException;

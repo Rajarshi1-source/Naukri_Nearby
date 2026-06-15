@@ -1,6 +1,6 @@
 package com.naukrinearby.generation;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.exception.ResumeParseException;
 
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;

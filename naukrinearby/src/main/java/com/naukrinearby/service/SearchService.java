@@ -8,7 +8,7 @@ import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.FieldValue;
 import co.elastic.clients.elasticsearch.core.search.Hit;
 import co.elastic.clients.elasticsearch.core.search.TotalHits;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.config.SearchProperties;
 import com.naukrinearby.model.dto.search.SearchQuery;
 import com.naukrinearby.model.dto.search.SearchResponse;

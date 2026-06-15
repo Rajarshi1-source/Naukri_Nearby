@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.List;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.naukrinearby.config.SearchProperties;
 import com.naukrinearby.model.dto.search.SearchQuery;
 import com.naukrinearby.model.dto.search.SearchResponse;
@@ -18,6 +17,7 @@ import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
+import tools.jackson.databind.json.JsonMapper;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,7 +52,7 @@ class SearchServiceFallbackTest {
 
 		SearchProperties props = new SearchProperties("jobs", Duration.ofMinutes(5), 20, "geo", 50, 60);
 		SearchService service = new SearchService(es, jobRepo, mock(SearchRankingStrategy.class),
-				mock(HybridSearchStrategy.class), props, redis, new ObjectMapper(),
+				mock(HybridSearchStrategy.class), props, redis, new JsonMapper(),
 				new SimpleMeterRegistry());
 
 		SearchResponse response = service.search(new SearchQuery("plumber", 26.84, 80.94, 10, null, 20));

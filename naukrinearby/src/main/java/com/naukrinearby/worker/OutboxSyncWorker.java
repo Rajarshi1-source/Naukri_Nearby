@@ -7,7 +7,7 @@ import java.util.Map;
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
 import co.elastic.clients.elasticsearch._types.VersionType;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.config.SearchProperties;
 import com.naukrinearby.model.entity.OutboxEvent;
 import com.naukrinearby.repository.OutboxRepository;
