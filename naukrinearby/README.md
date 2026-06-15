@@ -16,7 +16,7 @@ and an idempotent WhatsApp alert pipeline (Twilio/Bhashini stubbed).
 
 ## Datastores
 - PostgreSQL 16 + **PostGIS** + **pgvector** (source of truth) — built from `docker/postgres/Dockerfile`.
-- Elasticsearch 8.13 (derived search index), Redis 7 (cache/streams/idempotency), MinIO (resumes).
+- Elasticsearch 9.2 (derived search index), Redis 7 (cache/streams/idempotency), MinIO (resumes).
 
 ## Run locally
 ```bash

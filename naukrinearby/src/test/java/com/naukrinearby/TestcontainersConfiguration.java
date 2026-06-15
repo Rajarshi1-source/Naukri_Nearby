@@ -22,7 +22,7 @@ class TestcontainersConfiguration {
 	@SuppressWarnings("resource")
 	ElasticsearchContainer elasticsearchContainer() {
 		return new ElasticsearchContainer(
-				DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:8.13.0"))
+				DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:9.2.8"))
 				.withEnv("xpack.security.enabled", "false")
 				.withEnv("ES_JAVA_OPTS", "-Xms512m -Xmx512m");
 	}
