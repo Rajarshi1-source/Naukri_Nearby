@@ -1,7 +1,16 @@
-# NaukriNearby — Frontend (Next.js 14)
+# NaukriNearby — Frontend (Next.js 16)
 
-Lean MVP frontend for the NaukriNearby hyperlocal job board. App Router + TypeScript + Tailwind CSS,
-with Leaflet/OpenStreetMap for the map. It talks to the Spring Boot backend over REST.
+Frontend for the NaukriNearby hyperlocal job board. Next.js 16 App Router (React 19.2, Turbopack) +
+TypeScript, **Tailwind CSS v4 + shadcn/ui** components, **Zod** validation at API boundaries, and
+**TanStack React Query** for search/polling. Leaflet/OpenStreetMap powers the map. It talks to the
+Spring Boot backend over REST.
+
+## Architecture
+- `src/` layout: `src/app` (routes), `src/components` (incl. `ui/` shadcn primitives),
+  `src/lib` (api client, auth, utils), `src/types` (Zod schemas + inferred types),
+  `src/services` (Zod-parsing API wrappers), `src/hooks` (React Query hooks), `src/proxy.ts` (route gate).
+- `src/proxy.ts` replaces `middleware.ts`: a cookie-presence gate over `/candidate` and `/employer`
+  (defense-in-depth; real JWT checks stay at the API).
 
 ## Features in this MVP
 - Phone + OTP login/register (candidate or employer), with JWT access/refresh handling and a
@@ -19,7 +28,7 @@ Out of scope (MVP): dashboards, notification-preferences UI, employer job-postin
 transliteration/voice.
 
 ## Prerequisites
-- Node 20+
+- Node 24+ (LTS)
 - The backend running and reachable (default `http://localhost:8080`). See `../naukrinearby`.
 
 ## Quick start (local dev)
@@ -35,7 +44,7 @@ Dev OTP: the backend's stub OTP provider accepts code `123456`.
 - `npm run dev` — dev server
 - `npm run build` — production build (Next standalone output)
 - `npm run start` — run the production build
-- `npm run lint` — ESLint (`next/core-web-vitals`)
+- `npm run lint` — ESLint flat config (`eslint .`, extends `next/core-web-vitals` + `next/typescript`)
 
 ## Configuration
 - `NEXT_PUBLIC_API_URL` — backend base URL. Inlined at **build time** (it is a `NEXT_PUBLIC_*`
