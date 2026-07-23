@@ -26,6 +26,13 @@ public class StubLlmExtractionProvider implements LlmExtractionProvider {
 	private static final Pattern YEARS = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(saal|years?|yr)");
 	private static final Pattern MONTHS = Pattern.compile("(\\d+)\\s*(mahine|months?)");
 
+	/**
+	 * The prompt template ends with this exact line immediately before the injected resume text.
+	 * Heuristics must run on the resume ONLY — the template above this marker lists every canonical
+	 * skill and example numbers/emails, which would otherwise leak into every extraction.
+	 */
+	private static final String RESUME_MARKER = "Output ONLY the JSON object.";
+
 	private static final Map<String, List<String>> SKILL_MAP = new LinkedHashMap<>();
 	static {
 		SKILL_MAP.put("tally", List.of("Tally"));
@@ -41,10 +48,23 @@ public class StubLlmExtractionProvider implements LlmExtractionProvider {
 		SKILL_MAP.put("inverter", List.of("Inverter Repair"));
 		SKILL_MAP.put("plumber", List.of("Plumbing"));
 		SKILL_MAP.put("plumbing", List.of("Plumbing"));
+		SKILL_MAP.put("pipe fitting", List.of("Pipe Fitting"));
 		SKILL_MAP.put("welding", List.of("Welding"));
 		SKILL_MAP.put("fitter", List.of("Fitter"));
 		SKILL_MAP.put("dukaan", List.of("Retail Sales", "Customer Service"));
 		SKILL_MAP.put("kirana", List.of("Retail Sales", "Customer Service"));
+	}
+
+	/** Known Indian cities (lowercase -> canonical Title Case) for heuristic city detection. */
+	private static final Map<String, String> CITY_MAP = new LinkedHashMap<>();
+	static {
+		for (String city : List.of(
+				"Kanpur", "Pune", "Lucknow", "Jaipur", "Hyderabad", "Indore", "Nagpur", "Bhopal",
+				"Mumbai", "Delhi", "Bengaluru", "Bangalore", "Chennai", "Kolkata", "Ahmedabad",
+				"Surat", "Patna", "Ranchi", "Bhubaneswar", "Coimbatore", "Kochi", "Visakhapatnam",
+				"Vadodara", "Ludhiana", "Agra", "Varanasi", "Nashik", "Rajkot", "Meerut", "Amritsar")) {
+			CITY_MAP.put(city.toLowerCase(), city);
+		}
 	}
 
 	@Override
@@ -53,17 +73,20 @@ public class StubLlmExtractionProvider implements LlmExtractionProvider {
 		if (!schema.equals(ResumeParseResult.class)) {
 			throw new UnsupportedOperationException("Stub provider only supports ResumeParseResult");
 		}
-		String text = prompt.toLowerCase();
+		String resume = resumeSection(prompt);
+		String text = resume.toLowerCase();
 		ResumeParseResult r = new ResumeParseResult();
 
-		Matcher phone = PHONE.matcher(prompt);
+		Matcher phone = PHONE.matcher(resume);
 		if (phone.find()) {
 			r.setPhone(phone.group(1));
 		}
-		Matcher email = EMAIL.matcher(prompt);
+		Matcher email = EMAIL.matcher(resume);
 		if (email.find()) {
 			r.setEmail(email.group());
 		}
+
+		r.setCity(detectCity(text));
 
 		List<String> skills = new ArrayList<>();
 		for (var entry : SKILL_MAP.entrySet()) {
@@ -89,6 +112,26 @@ public class StubLlmExtractionProvider implements LlmExtractionProvider {
 		r.setTotalExperienceMonths(months);
 		r.setPromptVersion(promptVersion);
 		return (T) r;
+	}
+
+	/** Returns only the resume portion of a rendered prompt (everything after the final marker line). */
+	private static String resumeSection(String prompt) {
+		int idx = prompt.lastIndexOf(RESUME_MARKER);
+		return idx < 0 ? prompt : prompt.substring(idx + RESUME_MARKER.length());
+	}
+
+	/** Returns the canonical name of the first known city mentioned in the resume, or null. */
+	private static String detectCity(String lowerText) {
+		String best = null;
+		int bestIdx = Integer.MAX_VALUE;
+		for (var entry : CITY_MAP.entrySet()) {
+			Matcher m = Pattern.compile("\\b" + Pattern.quote(entry.getKey()) + "\\b").matcher(lowerText);
+			if (m.find() && m.start() < bestIdx) {
+				bestIdx = m.start();
+				best = entry.getValue();
+			}
+		}
+		return best;
 	}
 
 	@Override
