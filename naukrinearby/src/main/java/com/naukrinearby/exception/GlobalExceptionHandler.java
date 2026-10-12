@@ -9,6 +9,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 /** Single source of RFC 9457 ProblemDetail responses (security-and-api.md §B.2). */
 @Slf4j
@@ -18,6 +19,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(NotFoundException.class)
 	ProblemDetail handleNotFound(NotFoundException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
+	}
+
+	/** Unmapped URL (e.g. /actuator/** on the public port): a 404, not the catch-all 500. */
+	@ExceptionHandler(NoResourceFoundException.class)
+	ProblemDetail handleNoResource(NoResourceFoundException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "No such endpoint");
 	}
 
 	@ExceptionHandler(DuplicateApplicationException.class)

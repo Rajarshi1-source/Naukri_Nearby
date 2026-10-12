@@ -3,8 +3,11 @@ package com.naukrinearby.config;
 import java.time.Duration;
 import java.util.List;
 
+import jakarta.servlet.DispatcherType;
+
 import com.naukrinearby.security.ApiRateLimitFilter;
 import com.naukrinearby.security.JwtAuthFilter;
+import com.naukrinearby.security.ManagementPortScrapeMatcher;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -30,6 +33,7 @@ public class SecurityConfig {
 
 	private final JwtAuthFilter jwtAuthFilter;
 	private final ApiRateLimitFilter apiRateLimitFilter;
+	private final ManagementPortScrapeMatcher managementPortScrapeMatcher;
 
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -40,6 +44,10 @@ public class SecurityConfig {
 				.cors(Customizer.withDefaults())
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
+						// The entry point / access-denied handler use sendError(401/403), which re-dispatches to
+						// /error. Without this, that ERROR dispatch is re-authorized with an empty (stateless)
+						// context and every 403 surfaces as 401.
+						.dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
 						// Only the token-issuing endpoints are public; /api/auth/me needs a principal
 						// (falls through to authenticated() → 401, instead of an NPE → 500).
 						.requestMatchers("/api/auth/send-otp", "/api/auth/verify-otp", "/api/auth/refresh",
@@ -48,6 +56,9 @@ public class SecurityConfig {
 						.requestMatchers("/api/internal/**").permitAll() // guarded by X-Eval-Key + @ConditionalOnProperty
 						.requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
 						.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+						// Prometheus scrape: open ONLY on the internal management port (8081); the same
+						// path on any other port still falls through to the ADMIN rule below.
+						.requestMatchers(managementPortScrapeMatcher).permitAll()
 						.requestMatchers("/actuator/**").hasRole("ADMIN")
 						.requestMatchers("/api/employer/**").hasRole("EMPLOYER")
 						.requestMatchers("/api/candidate/**").hasRole("CANDIDATE")

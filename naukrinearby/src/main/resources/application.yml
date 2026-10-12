@@ -36,6 +36,11 @@ spring:
       enabled: false
 
 management:
+  # Actuator lives on its own port, which is internal only (never published or exposed by the k8s Service).
+  # Health/info are public there, /actuator/prometheus is open for scraping only on this port, and
+  # everything else requires ADMIN. See SecurityConfig + ManagementPortScrapeMatcher.
+  server:
+    port: ${MANAGEMENT_PORT:8081}
   endpoints:
     web:
       exposure:

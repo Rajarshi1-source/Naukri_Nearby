@@ -12,6 +12,27 @@ workers off) and a **worker** tier (`worker`, runs outbox sync + notification co
   `notification_queue_depth`, `notification_dlq_depth`, plus Resilience4j circuit-breaker metrics and
   `/actuator/circuitbreakers`.
 
+### Actuator ports and access
+Actuator runs on a separate **management port** (`management.server.port`, env `MANAGEMENT_PORT`,
+default **8081**). The public API port (8080) serves no actuator endpoints.
+
+| Endpoint (port 8081) | Access |
+| --- | --- |
+| `/actuator/health/**` (liveness/readiness), `/actuator/info` | public (k8s probes, CI wait loop) |
+| `/actuator/prometheus` | anonymous **only on 8081** (Prometheus scrape); ADMIN-only on any other port |
+| everything else (`metrics`, `circuitbreakers`, `retries`, …) | `ROLE_ADMIN` JWT |
+
+Rules that keep the scrape safe:
+- **Never publish 8081.** Compose doesn't run the app; on the host, firewall 8081 to the Prometheus
+  host. In k8s the Service exposes only `http` (8080), Prometheus scrapes pods directly via the
+  `prometheus.io/*` annotations, and `k8s/network-policy.yaml` admits 8081 only from the
+  `monitoring` namespace.
+- The scrape exemption keys off the socket's local port (`ManagementPortScrapeMatcher`), not the
+  `Host` header, so it can't be reached by spoofing headers through the public port.
+- If Grafana panels are empty: check `curl http://<app-host>:8081/actuator/prometheus` from the
+  Prometheus host (expect 200), then the target state at Prometheus → Status → Targets. A 401 there
+  means the request isn't hitting the management port.
+
 ## Outbox lag / failures (ADR 0001)
 Symptoms: search results stale; `notification_queue_depth` flat while jobs are created.
 1. Check `PENDING` backlog: `SELECT status, count(*) FROM outbox_events GROUP BY status;`

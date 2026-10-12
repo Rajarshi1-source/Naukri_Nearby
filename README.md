@@ -90,7 +90,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). The API is [http://localhost:8080](http://localhost:8080). Health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health). MinIO console: [http://localhost:9001](http://localhost:9001).
+Open [http://localhost:3000](http://localhost:3000). The API is [http://localhost:8080](http://localhost:8080). Health (management port): [http://localhost:8081/actuator/health](http://localhost:8081/actuator/health). RustFS console: [http://localhost:9001](http://localhost:9001).
 
 Optional Compose profiles, from `naukrinearby/`:
 
@@ -178,8 +178,8 @@ docker compose --profile observability up -d
 
 | Surface | URL | Notes |
 | --- | --- | --- |
-| App metrics | `http://localhost:8080/actuator/prometheus` | Also `health`, `info`, `metrics`, `circuitbreakers` |
-| Prometheus | `http://localhost:9090` | Scrapes the host app at `host.docker.internal:8080` |
+| App metrics | `http://localhost:8081/actuator/prometheus` | Internal management port. The scrape is anonymous only here; `metrics`/`circuitbreakers` need an ADMIN JWT; nothing actuator on 8080. See the [runbook](docs/runbooks/operations.md#actuator-ports-and-access) |
+| Prometheus | `http://localhost:9090` | Scrapes the host app at `host.docker.internal:8081` |
 | Grafana | `http://localhost:3001` | User `admin` / `admin`. Dashboard **NaukriNearby — KPIs** is provisioned |
 | Langfuse | `http://localhost:3002` | Separate Postgres. Set `NEXTAUTH_SECRET` and `SALT` before any shared use |
 

@@ -3,9 +3,11 @@ global:
   evaluation_interval: 15s
 
 scrape_configs:
-  # The Spring Boot app runs on the host (via ./gradlew bootRun) and exposes Micrometer/Prometheus
-  # at /actuator/prometheus. When the app itself is containerized, replace the target with its service name.
+  # The Spring Boot app runs on the host (via ./gradlew bootRun) and serves Micrometer/Prometheus on
+  # its internal management port (management.server.port, default 8081). /actuator/prometheus is
+  # anonymous there and only there; on the public API port (8080) it is ADMIN-only. Never publish 8081.
+  # When the app itself is containerized, replace the target with its service name.
   - job_name: 'naukrinearby'
     metrics_path: '/actuator/prometheus'
     static_configs:
-      - targets: ['host.docker.internal:8080']
+      - targets: ['host.docker.internal:8081']

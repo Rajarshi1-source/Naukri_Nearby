@@ -40,6 +40,8 @@ even when the skill is not auto-triggered. The skills remain the authoritative s
 ## Security mandate (see security-and-api.md)
 - Auth: phone + OTP -> JWT (RS256), stateless sessions; refresh tokens stored in Redis by `jti`.
 - Rate limit OTP (5/hr) and APIs via Redis; verify Twilio webhook signatures; dedup on `MessageSid`.
+- Actuator is on the internal management port 8081. Only health/info and the Prometheus scrape (8081 only,
+  via `ManagementPortScrapeMatcher`) are anonymous; all other actuator endpoints need `ROLE_ADMIN`.
 - Resumes are PII (DPDP Act): encrypt at rest, signed-URL access, redact PII in logs.
 
 ## Consistency & resilience
