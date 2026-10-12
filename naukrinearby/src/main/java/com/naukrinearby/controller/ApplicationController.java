@@ -1,5 +1,6 @@
 package com.naukrinearby.controller;
 
+import com.naukrinearby.model.dto.PageResponse;
 import com.naukrinearby.model.dto.application.ApplicationCreateRequest;
 import com.naukrinearby.model.dto.application.ApplicationResponse;
 import com.naukrinearby.model.dto.application.ApplicationStatusUpdateRequest;
@@ -9,7 +10,6 @@ import com.naukrinearby.service.ApplicationService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -50,17 +50,17 @@ public class ApplicationController {
 
 	@GetMapping("/api/candidate/applications")
 	@PreAuthorize("hasRole('CANDIDATE')")
-	public Page<ApplicationResponse> myApplications(Pageable pageable,
+	public PageResponse<ApplicationResponse> myApplications(Pageable pageable,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return applicationService.myApplications(principal.id(), pageable).map(ApplicationResponse::from);
+		return PageResponse.from(applicationService.myApplications(principal.id(), pageable), ApplicationResponse::from);
 	}
 
 	@GetMapping("/api/employer/jobs/{id}/applications")
 	@PreAuthorize("hasRole('EMPLOYER')")
-	public Page<ApplicationResponse> applicants(@PathVariable("id") Long jobId, Pageable pageable,
+	public PageResponse<ApplicationResponse> applicants(@PathVariable("id") Long jobId, Pageable pageable,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return applicationService.applicantsForJob(jobId, principal.id(), pageable)
-				.map(ApplicationResponse::from);
+		return PageResponse.from(applicationService.applicantsForJob(jobId, principal.id(), pageable),
+				ApplicationResponse::from);
 	}
 
 	@PatchMapping("/api/applications/{id}/status")

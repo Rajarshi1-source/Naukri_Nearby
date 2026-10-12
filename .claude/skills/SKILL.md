@@ -454,6 +454,7 @@ is gone. Run `./gradlew build` (it needs a Docker daemon) before calling a chang
 | Scattered `@Value` | `@ConfigurationProperties` record |
 | `ResponseEntity<ErrorResponse>` ad-hoc errors | `ProblemDetail` via `@RestControllerAdvice` |
 | Mapping lazy entities in a loop | `JOIN FETCH` / `@EntityGraph` / DTO projection |
+| Returning Spring Data `Page<T>` from a controller | `PageResponse.from(page, Dto::from)` (stable JSON, no PageImpl warning) |
 | Hardcoded API keys | env-bound `@ConfigurationProperties` |
 
 ## Quick reference

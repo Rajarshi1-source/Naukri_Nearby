@@ -1,6 +1,7 @@
 package com.naukrinearby.controller;
 
 import com.naukrinearby.model.dto.DashboardStatsDTO;
+import com.naukrinearby.model.dto.PageResponse;
 import com.naukrinearby.model.dto.job.JobCreateRequest;
 import com.naukrinearby.model.dto.job.JobResponse;
 import com.naukrinearby.model.dto.job.JobStatusUpdateRequest;
@@ -11,7 +12,6 @@ import com.naukrinearby.service.JobService;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -57,8 +57,8 @@ public class JobController {
 	/** Read-your-writes: the employer's own jobs are read from Postgres, not ES (master plan §9.5). */
 	@GetMapping("/api/employer/jobs")
 	@PreAuthorize("hasRole('EMPLOYER')")
-	public Page<JobResponse> myJobs(Pageable pageable, @AuthenticationPrincipal AuthPrincipal principal) {
-		return jobService.employerJobs(principal.id(), pageable).map(JobResponse::from);
+	public PageResponse<JobResponse> myJobs(Pageable pageable, @AuthenticationPrincipal AuthPrincipal principal) {
+		return PageResponse.from(jobService.employerJobs(principal.id(), pageable), JobResponse::from);
 	}
 
 	@GetMapping("/api/employer/dashboard/stats")

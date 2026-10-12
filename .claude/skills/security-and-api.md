@@ -242,7 +242,7 @@ JOBS (employer)
   POST   /api/jobs                     JobCreateRequest                → 201 JobResponse  (writes outbox event)
   PUT    /api/jobs/{id}                JobUpdateRequest                → 200 JobResponse
   PATCH  /api/jobs/{id}/status         { status }                      → 200
-  GET    /api/employer/jobs                                           → 200 Page<JobResponse>
+  GET    /api/employer/jobs                                           → 200 PageResponse<JobResponse>
 
 SEARCH (public)
   GET    /api/jobs/search?lat&lng&radius&q&category&sort&page          → 200 SearchResponse
@@ -257,8 +257,8 @@ CANDIDATE
 
 APPLICATIONS
   POST   /api/applications             { jobId, coverNote? }           → 201  (idempotent on (job,candidate))
-  GET    /api/candidate/applications                                  → 200 Page<ApplicationResponse>
-  GET    /api/employer/jobs/{id}/applicants                           → 200 Page<ApplicantResponse>
+  GET    /api/candidate/applications                                  → 200 PageResponse<ApplicationResponse>
+  GET    /api/employer/jobs/{id}/applicants                           → 200 PageResponse<ApplicantResponse>
   PATCH  /api/applications/{id}/status { status }                     → 200
 
 NOTIFICATIONS
@@ -304,8 +304,11 @@ Status-code conventions:
 
 - **Auth header:** `Authorization: Bearer <accessToken>` on every protected endpoint. Public job
   reads need none.
-- **Pagination:** `?page=0&size=20&sort=createdAt,desc`; responses are Spring `Page<T>` (content +
-  `totalElements` + `totalPages` + `number`). Cap `size` (e.g. ≤ 50) to prevent heavy queries.
+- **Pagination:** `?page=0&size=20&sort=createdAt,desc`. Responses are `PageResponse<T>`
+  (`content`, `number`, `size`, `totalElements`, `totalPages`), built with
+  `PageResponse.from(page, Dto::from)`. **Never return Spring Data `Page<T>` from a controller:**
+  PageImpl's JSON (`pageable`, `sort`, …) is not a stable contract, and Spring Data warns on it. Cap
+  `size` (e.g. ≤ 50) to prevent heavy queries.
 - **Versioning:** prefer Framework 7 API versioning (e.g. an `X-API-Version` header or a version
   predicate) over scattering `/v1/` across controllers. Keep one strategy.
 - **Read-your-writes:** the employer "my jobs" view reads from Postgres (source of truth), not ES,
