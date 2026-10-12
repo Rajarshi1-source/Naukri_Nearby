@@ -87,6 +87,8 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())            // see A.7
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // sendError(401/403) re-dispatches to /error; permit that dispatch or every 403 becomes 401.
+                .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                 // List public auth endpoints EXPLICITLY. Never permitAll("/api/auth/**"): it would also
                 // open /api/auth/me, which then runs with a null principal (NPE → 500 instead of 401).
                 .requestMatchers("/api/auth/send-otp", "/api/auth/verify-otp",
@@ -95,7 +97,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()   // public job pages (SEO)
                 .requestMatchers("/api/employer/**").hasRole("EMPLOYER")
                 .requestMatchers("/api/candidate/**").hasRole("CANDIDATE")
-                .requestMatchers("/actuator/health/**").permitAll()
+                .requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
+                // Actuator lives on the internal management port (management.server.port=8081). The
+                // scrape is anonymous ONLY there: ManagementPortScrapeMatcher checks the socket's local
+                // port (never the Host header) and fails closed if actuator shares the public port.
+                .requestMatchers(managementPortScrapeMatcher).permitAll()
                 .requestMatchers("/actuator/**").hasRole("ADMIN")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
