@@ -229,6 +229,12 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
 
+    // Unmapped URLs throw NoResourceFoundException. Without this they become a catch-all 500.
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail handleNoResource(NoResourceFoundException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "No such endpoint");
+    }
+
     // REQUIRED whenever a catch-all exists: @PreAuthorize denials reach this advice first.
     @ExceptionHandler(AccessDeniedException.class)
     ProblemDetail handleAccessDenied(AccessDeniedException ex) {
@@ -374,6 +380,13 @@ Expose Actuator + Prometheus (`/actuator/prometheus`); use Micrometer `@Observed
 latency, parse time, delivery rate, and queue depth; wire the OpenTelemetry starter for traces.
 Surface custom metrics the Grafana panels expect (`search_duration_seconds`,
 `resume_parse_duration_seconds`, `notifications_sent_total`, stream pending count).
+
+**Actuator runs on the internal management port** (`management.server.port: ${MANAGEMENT_PORT:8081}`,
+`0` in tests, read with `@LocalManagementPort`). Probes and Prometheus target 8081, and the public
+port 8080 maps no actuator endpoints. Never make an actuator endpoint public by path alone: Boot
+applies the same filter chain on both ports, so a path-only `permitAll` would also open it on 8080.
+Use `ManagementPortScrapeMatcher` (local-port based). Never publish 8081 or add it to the k8s
+Service (see `k8s/network-policy.yaml`).
 
 ## Testing (Testcontainers + RestTestClient)
 

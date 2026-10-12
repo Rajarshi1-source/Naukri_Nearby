@@ -18,4 +18,6 @@ RUN useradd -r -u 1001 appuser
 COPY --from=build /workspace/build/libs/*.jar app.jar
 USER appuser
 EXPOSE 8080
+# Management/actuator port (health probes + Prometheus scrape). Internal only: never publish it.
+EXPOSE 8081
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

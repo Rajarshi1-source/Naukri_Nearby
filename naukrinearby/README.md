@@ -37,7 +37,7 @@ model. Set `EXTRACTION_PROVIDER=gpt5mini` + `LLM_API_KEY` for real resume extrac
 - `POST /api/jobs` (employer), `GET /api/jobs/search`, `GET /api/jobs/{slug}`, `GET /api/employer/jobs`
 - `POST /api/resumes/upload` (candidate, 202), `GET /api/resumes/{id}/parse-status`
 - `POST /api/jobs/{id}/apply`, `GET /api/candidate/recommendations`, `.../notification-preferences`
-- `POST /api/webhooks/twilio` (signature-verified), `GET /actuator/prometheus`
+- `POST /api/webhooks/twilio` (signature-verified); actuator on the internal management port 8081 (`/actuator/prometheus` scrape, health probes)
 
 ## Tests
 ```bash

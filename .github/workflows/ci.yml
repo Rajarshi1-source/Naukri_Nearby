@@ -68,7 +68,7 @@ jobs:
           ./gradlew --no-daemon bootJar -x test
           nohup java -jar build/libs/*.jar > app.log 2>&1 &
           for i in $(seq 1 60); do
-            curl -sf http://localhost:8080/actuator/health && break || sleep 5
+            curl -sf http://localhost:8081/actuator/health && break || sleep 5   # actuator is on the management port
           done
       - name: Run eval gate
         working-directory: naukrinearby/eval

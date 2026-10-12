@@ -238,6 +238,18 @@ class ApiEndpointsIntegrationTests {
 				.jsonPath("$.status").isEqualTo(403);
 	}
 
+	@Test
+	void candidate_onEmployerOnlyPath_getsForbidden_notUnauthorized() {
+		RestTestClient client = client();
+		String candidateToken = token(client, nextPhone(), "CANDIDATE");
+
+		// Path-level role denial: sendError(403) must survive the /error re-dispatch (was a 401).
+		client.get().uri("/api/employer/jobs")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.exchange()
+				.expectStatus().isForbidden();
+	}
+
 	private String token(RestTestClient client, String phone, String role) {
 		client.post().uri("/api/auth/send-otp")
 				.contentType(MediaType.APPLICATION_JSON)

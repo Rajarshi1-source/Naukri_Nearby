@@ -1,0 +1,19 @@
+# Restricts the actuator/management port (8081) to the monitoring namespace (Prometheus). The API port
+# stays open to in-cluster traffic (e.g. the ingress controller). Kubelet health probes are not subject
+# to NetworkPolicy on mainstream CNIs. Requires a NetworkPolicy-enforcing CNI (Calico, Cilium, ...).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: naukrinearby-ingress
+spec:
+  podSelector:
+    matchLabels: { app: naukrinearby }
+  policyTypes: [Ingress]
+  ingress:
+    - ports:
+        - port: 8080
+    - from:
+        - namespaceSelector:
+            matchLabels: { kubernetes.io/metadata.name: monitoring }
+      ports:
+        - port: 8081

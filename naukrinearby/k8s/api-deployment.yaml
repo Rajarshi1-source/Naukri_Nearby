@@ -12,12 +12,20 @@ spec:
   template:
     metadata:
       labels: { app: naukrinearby, tier: api }
+      annotations:
+        # Prometheus scrapes the pod directly on the internal management port; the Service never exposes it.
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8081"
+        prometheus.io/path: "/actuator/prometheus"
     spec:
       containers:
         - name: api
           image: naukrinearby/app:latest
           ports:
             - containerPort: 8080
+              name: http
+            - containerPort: 8081
+              name: management   # actuator: probes + metrics (internal only)
           env:
             - name: SPRING_PROFILES_ACTIVE
               value: "api"
@@ -25,11 +33,11 @@ spec:
             - configMapRef: { name: naukrinearby-config }
             - secretRef: { name: naukrinearby-secrets }
           readinessProbe:
-            httpGet: { path: /actuator/health/readiness, port: 8080 }
+            httpGet: { path: /actuator/health/readiness, port: management }
             initialDelaySeconds: 20
             periodSeconds: 10
           livenessProbe:
-            httpGet: { path: /actuator/health/liveness, port: 8080 }
+            httpGet: { path: /actuator/health/liveness, port: management }
             initialDelaySeconds: 30
             periodSeconds: 15
           resources:
@@ -44,7 +52,7 @@ spec:
   selector: { app: naukrinearby, tier: api }
   ports:
     - port: 80
-      targetPort: 8080
+      targetPort: http   # API only: the management port (8081) is deliberately NOT exposed
 ---
 # Scale API on CPU; request volume is the dominant driver for the stateless tier.
 apiVersion: autoscaling/v2
