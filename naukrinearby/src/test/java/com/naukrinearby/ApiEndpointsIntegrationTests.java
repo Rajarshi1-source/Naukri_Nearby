@@ -6,7 +6,10 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
@@ -14,6 +17,8 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.client.RestTestClient;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 @Import(TestcontainersConfiguration.class)
 @ActiveProfiles("test")
@@ -158,6 +163,29 @@ class ApiEndpointsIntegrationTests {
 				.header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
 				.exchange()
 				.expectStatus().isNoContent();
+	}
+
+	@Test
+	@ExtendWith(OutputCaptureExtension.class)
+	void pagedEndpoints_returnStablePageResponseShape(CapturedOutput output) {
+		RestTestClient client = client();
+		String employerToken = token(client, nextPhone(), "EMPLOYER");
+		postJson(client, employerToken, "/api/jobs", jobBody());
+
+		client.get().uri("/api/employer/jobs?page=0&size=5")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + employerToken)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody()
+				.jsonPath("$.content.length()").isEqualTo(1)
+				.jsonPath("$.number").isEqualTo(0)
+				.jsonPath("$.size").isEqualTo(5)
+				.jsonPath("$.totalElements").isEqualTo(1)
+				.jsonPath("$.totalPages").isEqualTo(1)
+				.jsonPath("$.pageable").doesNotExist(); // no leaked Spring Data internals
+
+		// The DTO replaces raw PageImpl serialization, so Spring Data's warning must not fire.
+		assertThat(output).doesNotContain("Serializing PageImpl instances as-is");
 	}
 
 	private Map<String, Object> jobBody() {
