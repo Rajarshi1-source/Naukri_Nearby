@@ -1,9 +1,11 @@
 # NaukriNearby — Security & API Reference
 
-Detailed reference for the Spring Boot 4.0.6 / Spring Framework 7 backend, loaded on demand for any
+Detailed reference for the Spring Boot 4.1.1 / Spring Framework 7 backend, loaded on demand for any
 task touching **authentication, authorization, secrets, PII handling, or the REST contract**. The
 main `SKILL.md` carries the day-to-day rules; this file carries the depth. All examples are Java 21,
-Spring Security 7, stateless JWT.
+Spring Security 7.1 (Boot 4.1.1-managed), stateless JWT via `spring-boot-starter-oauth2-resource-server`.
+Use only the lambda DSL, and don't use APIs marked `@Deprecated` in Security 7.x, since they are
+scheduled for removal. The build must stay `-Xlint:deprecation` clean.
 
 ---
 
@@ -85,7 +87,11 @@ public class SecurityConfig {
             .cors(Customizer.withDefaults())            // see A.7
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/**", "/api/webhooks/**").permitAll()
+                // List public auth endpoints EXPLICITLY. Never permitAll("/api/auth/**"): it would also
+                // open /api/auth/me, which then runs with a null principal (NPE → 500 instead of 401).
+                .requestMatchers("/api/auth/send-otp", "/api/auth/verify-otp",
+                                 "/api/auth/refresh", "/api/auth/logout").permitAll()
+                .requestMatchers("/api/webhooks/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()   // public job pages (SEO)
                 .requestMatchers("/api/employer/**").hasRole("EMPLOYER")
                 .requestMatchers("/api/candidate/**").hasRole("CANDIDATE")
@@ -102,6 +108,12 @@ public class SecurityConfig {
     }
 }
 ```
+
+> **403s from `@PreAuthorize`:** a method-security denial throws `AuthorizationDeniedException` (an
+> `AccessDeniedException`) *inside* the MVC call, so it reaches `@RestControllerAdvice` before Spring
+> Security's `accessDeniedHandler`. `GlobalExceptionHandler` must map `AccessDeniedException` to a 403
+> `ProblemDetail`, or the catch-all `@ExceptionHandler(Exception.class)` turns every denial into a
+> 500. Cover each new role rule with a "wrong role → 403" integration test.
 
 > CSRF note: disabling CSRF is correct **only** because the API is stateless and the token travels
 > in the `Authorization` header (not a cookie). If you ever store the JWT in a cookie, re-enable CSRF
@@ -166,7 +178,7 @@ The webhook path is `permitAll()` in the filter chain (Twilio has no JWT) — th
 
 ### A.6 Secrets & configuration
 
-- All credentials (LLM API key, Twilio SID/token, Bhashini key, JWT keys, DB password, MinIO keys)
+- All credentials (LLM API key, Twilio SID/token, Bhashini key, JWT keys, DB password, object-storage keys)
   come from environment variables via `@ConfigurationProperties` records — never hardcoded, never in
   `application.yml` committed to git. The repo ships an `.env.example` with empty placeholders only.
 - The JWT signing key (RS256 private key) is an injected secret, not a checked-in file. In
@@ -196,14 +208,14 @@ CorsConfigurationSource corsConfigurationSource(SecurityProperties props) {
 
 Resumes contain names, phones, addresses — personal data under India's DPDP Act (§13 of the plan).
 
-- **Encrypt resume files at rest** in MinIO/S3 (server-side encryption); serve them only via
+- **Encrypt resume files at rest** in RustFS/S3 (SSE-S3, `naukri.storage.encryption=sse` + `RUSTFS_SSE_S3_MASTER_KEY`); serve them only via
   **short-lived signed URLs**, never public links.
 - **Redact PII in logs:** never log full phone/email/resume text. Mask to `98XXXXXX10`. Add a log
   filter or a dedicated masking util; keep raw PII out of Langfuse traces (log skill tags, not the
   raw resume).
-- **Data residency:** keep Postgres/ES/Redis/MinIO in an India region (plan's data zones).
+- **Data residency:** keep Postgres/ES/Redis/object storage in an India region (plan's data zones).
 - **Right to erasure:** `ON DELETE CASCADE` on `user_id` FKs (already in the schema) plus a job that
-  purges the resume file from MinIO when a user is deleted.
+  purges the resume file from object storage when a user is deleted.
 - **Least data in tokens:** JWT claims hold `sub`/`role`, not name/email/phone.
 
 ---

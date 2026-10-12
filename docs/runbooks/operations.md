@@ -38,6 +38,6 @@ Set the relevant `*_PROVIDER` env + keys (see `.env.example` / `k8s/config-and-s
 and restart. Embedding dims must stay 1024 to match the pgvector column. No code change required.
 
 ## Right-to-erasure (DPDP)
-`DELETE /api/candidate/account` cascades all DB rows and purges the resume object from MinIO. To erase
+`DELETE /api/candidate/account` cascades all DB rows and purges the resume object from object storage (RustFS). To erase
 on request from ops, delete the `users` row (FKs cascade) and call `FileStorageService.delete(key)` for
 the stored `resume_file_key`.

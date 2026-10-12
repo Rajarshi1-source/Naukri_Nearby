@@ -40,7 +40,11 @@ public class SecurityConfig {
 				.cors(Customizer.withDefaults())
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth
-						.requestMatchers("/api/auth/**", "/api/webhooks/**").permitAll()
+						// Only the token-issuing endpoints are public; /api/auth/me needs a principal
+						// (falls through to authenticated() → 401, instead of an NPE → 500).
+						.requestMatchers("/api/auth/send-otp", "/api/auth/verify-otp", "/api/auth/refresh",
+								"/api/auth/logout").permitAll()
+						.requestMatchers("/api/webhooks/**").permitAll()
 						.requestMatchers("/api/internal/**").permitAll() // guarded by X-Eval-Key + @ConditionalOnProperty
 						.requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
 						.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()

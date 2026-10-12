@@ -15,7 +15,7 @@ The repository has two apps:
 - Employer job posts with category, skills, salary, and a map location constrained to India.
 - Public hyperlocal search: text + category + radius. Results are cached in Redis. If Elasticsearch is down, search falls back to PostGIS `ST_DWithin` and the API reports `fellBackToPostgis`.
 - Personalized recommendations (pgvector similarity plus distance) and an optional hybrid BM25 + vector ranking path (reciprocal rank fusion).
-- Resume upload to MinIO (PDF or photo), async parse, and a candidate profile filled from the extraction result.
+- Resume upload to S3-compatible object storage (RustFS; PDF or photo), async parse, and a candidate profile filled from the extraction result.
 - Apply is idempotent (`409` on a second apply). Candidates can save and unsave jobs.
 - Notification preferences, a Redis Streams alert pipeline, and dedup so the same candidate is not messaged twice for the same job.
 - WhatsApp status webhooks (Twilio signature check) and a WhatsApp-first apply conversation path.
@@ -28,14 +28,14 @@ External providers ship as stubs so the app runs with no API keys. Real LLM, emb
 
 | Layer | Choice |
 | --- | --- |
-| Backend | Spring Boot 4.0.6, Spring Framework 7, Java 21, Gradle (Kotlin DSL) |
+| Backend | Spring Boot 4.1.1, Spring Framework 7, Java 21, Gradle (Kotlin DSL) |
 | Frontend | Next.js 16 App Router, React 19.2, TypeScript, Node.js 24, Turbopack |
 | UI | Tailwind CSS v4, shadcn/ui, Leaflet / OpenStreetMap |
 | Client data | Zod at the API boundary, TanStack Query for search and resume-parse polling |
 | Source of truth | PostgreSQL 16 + PostGIS + pgvector |
-| Search index | Elasticsearch 9.2 (Java client 9.2.8, bundled with Spring Boot 4) |
+| Search index | Elasticsearch 9.4 (Java client 9.4.5, managed by Spring Boot 4.1.1) |
 | Cache and queues | Redis 7 (cache, Streams, rate limits, refresh tokens, idempotency) |
-| Object storage | MinIO (S3-compatible) for resumes |
+| Object storage | RustFS 1.0.1 (S3-compatible, Apache-2.0) for resumes, accessed via the MinIO Java SDK. Replaced MinIO, whose images left Docker Hub ([ADR 0006](docs/adr/0006-rustfs-object-storage.md)) |
 | Auth | Phone OTP → JWT (RS256). OTP, WhatsApp, and translation default to stubs |
 | AI | Config-selected adapters: GPT-5-mini-class extraction, local or remote embeddings (1024 dims), Bhashini translation |
 | Resilience | Resilience4j retry and circuit breakers on external calls |
@@ -56,8 +56,8 @@ Spring Boot API (:8080)          worker profile (outbox + notifications)
         │                                  │
         ├─ Postgres 16  ◄── outbox ────────┤
         │    PostGIS + pgvector            ▼
-        ├─ Redis 7                    Elasticsearch 9.2
-        └─ MinIO (resumes)
+        ├─ Redis 7                    Elasticsearch 9.4
+        └─ RustFS (resumes)
 ```
 
 API pods can run with `SPRING_PROFILES_ACTIVE=api`, which turns the sync and notification workers off. A separate worker deployment runs them. Manifests live in [`naukrinearby/k8s/`](naukrinearby/k8s/).
@@ -79,7 +79,7 @@ cp .env.example .env
 
 On Windows use `.\gradlew.bat bootRun`.
 
-Defaults match Compose: Postgres `localhost:5432` (`naukrinearby` / `postgres` / `postgres`), Redis `6379`, Elasticsearch `http://localhost:9200`, MinIO `http://localhost:9000` (`minioadmin` / `minioadmin`). Flyway applies migrations on startup, including `CREATE EXTENSION postgis` and `vector`. Leave `LLM_API_KEY` empty to stay on the offline defaults (OTP code `123456`).
+Defaults match Compose: Postgres `localhost:5432` (`naukrinearby` / `postgres` / `postgres`), Redis `6379`, Elasticsearch `http://localhost:9200`, RustFS `http://localhost:9000` (`minioadmin` / `minioadmin`, console on `:9001`). Flyway applies migrations on startup, including `CREATE EXTENSION postgis` and `vector`. Leave `LLM_API_KEY` empty to stay on the offline defaults (OTP code `123456`).
 
 Then the UI:
 
@@ -106,11 +106,11 @@ docker compose --profile observability up -d
 
 ## Local development (without Docker)
 
-Install the same services on the machine and point the app at them. Versions should match the stack above: PostgreSQL 16 with PostGIS and pgvector, Elasticsearch **9.2.8**, Redis 7, MinIO.
+Install the same services on the machine and point the app at them. Versions should match the stack above: PostgreSQL 16 with PostGIS and pgvector, Elasticsearch **9.4.5**, Redis 7, and RustFS (or any S3-compatible store).
 
 1. Create the database and role the app expects (`naukrinearby`, user `postgres`, password `postgres`), or set `SPRING_DATASOURCE_*` to whatever you created. The first Flyway migration runs `CREATE EXTENSION postgis` and `CREATE EXTENSION vector`, so both extensions must already be installed in that Postgres instance.
-2. Start Elasticsearch 9.2.8 in single-node mode with security disabled for local dev (`xpack.security.enabled=false`), listening on `http://localhost:9200`. A 9.x server is required: Spring Boot 4’s Java client sends `compatible-with=9` headers that an 8.x cluster rejects.
-3. Start Redis on `localhost:6379` and MinIO on `localhost:9000` with access key `minioadmin` and secret `minioadmin` (or override `MINIO_*`).
+2. Start Elasticsearch 9.4.5 in single-node mode with security disabled for local dev (`xpack.security.enabled=false`), listening on `http://localhost:9200`. A 9.x server is required: Spring Boot 4’s Java client sends `compatible-with=9` headers that an 8.x cluster rejects.
+3. Start Redis on `localhost:6379` and RustFS (or another S3-compatible store) on `localhost:9000` with access key `minioadmin` and secret `minioadmin` (or override `MINIO_*`).
 4. Configure and run the API:
 
 ```bash
@@ -134,7 +134,7 @@ Useful backend tasks:
 
 ```bash
 cd naukrinearby
-./gradlew test          # needs a Docker daemon — Testcontainers starts Postgres, ES, Redis, and MinIO
+./gradlew test          # needs a Docker daemon — Testcontainers starts Postgres, ES, Redis, and RustFS
 ./gradlew bootJar
 ```
 
@@ -193,7 +193,7 @@ Operational steps for outbox lag, notification DLQ replay, zero-downtime index a
 
 | Job | What it does |
 | --- | --- |
-| `build-and-test` | `./gradlew build` in `naukrinearby/`. Testcontainers uses the runner’s Docker daemon (Postgres image built from `docker/postgres`, Elasticsearch 9.2.8, Redis, MinIO). |
+| `build-and-test` | `./gradlew build` in `naukrinearby/`. Testcontainers uses the runner’s Docker daemon (Postgres image built from `docker/postgres`, Elasticsearch 9.4.5, Redis, RustFS). |
 | `test-frontend` | Node 24, `npm ci`, `npm run lint`, `npm run build`. |
 | `resume-eval-gate` | After the backend build: Compose infra, boot the jar with `EVAL_ENABLED=true` and `EXTRACTION_PROVIDER=stub`, then `python run_eval.py --ci`. |
 
@@ -203,7 +203,7 @@ There is no deploy job in that workflow. Kubernetes manifests for an API tier (`
 
 - **No dual-write.** Job create/update commits Postgres and the outbox together. Elasticsearch is updated only by `OutboxSyncWorker`. A version conflict on `job_id` is treated as already applied.
 - **Search stays up when Elasticsearch does not.** `SearchService` catches index failures and answers from PostGIS. The UI shows that degraded path.
-- **Pin Elasticsearch to 9.2.x.** The server image in Compose and in tests is `9.2.8`, matching the client that Spring Boot 4 pulls in. Do not point this build at an 8.x cluster.
+- **Pin Elasticsearch to the Boot-managed client.** The server image in Compose and in tests is `9.4.5`, matching the Java client that Spring Boot 4.1.1 manages. Bump both together on every Boot upgrade, and do not point this build at an 8.x cluster.
 - **Jackson 3.** Boot 4 auto-configures `tools.jackson.databind.ObjectMapper`. Application code injects that type. JSON annotations remain `com.fasterxml.jackson.annotation`.
 - **Provider selection is configuration.** One bean per port (`stub` / `local` / `none` by default). Production swaps are env changes, not new call sites. See [ADR 0002](docs/adr/0002-model-adapter-pattern.md).
 - **JWT keys.** If `JWT_PRIVATE_KEY` and `JWT_PUBLIC_KEY` are empty, the process generates an ephemeral RSA keypair. Tokens die on restart. Production must supply PEM keys.

@@ -1,7 +1,7 @@
 ---
 name: naukrinearby-spring-boot
 description: >-
-  Build and maintain the NaukriNearby backend on Spring Boot 4.0.6 (Spring Framework 7) with
+  Build and maintain the NaukriNearby backend on Spring Boot 4.1.1 (Spring Framework 7) with
   Java 21 and Gradle. Use this skill for ANY backend work — REST controllers, services,
   repositories, the transactional outbox + Elasticsearch sync, the provider-agnostic
   LLM/embedding/translation/Twilio adapters, Redis Streams pipelines, pgvector/PostGIS queries,
@@ -9,27 +9,49 @@ description: >-
   config, error handling, or tests — even when the version isn't named. Trigger on Spring Boot,
   Spring Framework 7, @HttpExchange / HTTP Service Clients, native @Retryable / @ConcurrencyLimit,
   Resilience4j, ProblemDetail, @Transactional, Spring Data JPA, Testcontainers, RestTestClient,
-  Actuator/Micrometer/OpenTelemetry, virtual threads, or Gradle. MANDATE: Spring Boot 4.0.6 +
-  Java 21 + Gradle — 3.x is at/after OSS end-of-life and Java 21 is fully supported on 4.0.6, so
-  do not generate 3.x or Java 25 code. Pair with naukrinearby-java21 for language concerns.
+  Actuator/Micrometer/OpenTelemetry, virtual threads, or Gradle. MANDATE: Spring Boot 4.1.1 +
+  Java 21 + Gradle — never generate 3.x code, APIs deprecated in 4.0 (removed in 4.1), or Java 25
+  code. Pair with naukrinearby-java21 for language concerns.
 ---
 
-# Spring Boot 4.0.6 (Framework 7) — NaukriNearby Backend
+# Spring Boot 4.1.1 (Framework 7) — NaukriNearby Backend
 
-You are a senior Spring engineer building NaukriNearby on **Spring Boot 4.0.6 / Spring Framework 7,
+You are a senior Spring engineer building NaukriNearby on **Spring Boot 4.1.1 / Spring Framework 7,
 Java 21, Gradle**. The backend is a layered REST application that orchestrates many external
 services and keeps a PostgreSQL (PostGIS + pgvector) source-of-truth consistent with an
 Elasticsearch search index via the **transactional outbox** pattern.
 
 ## Why this version (state it confidently if asked)
 
-- **Spring Boot 4.0.6 runs on Java 21** (it supports Java 17–26). Keep Java 21 LTS — the whole
-  project, Dockerfile (`eclipse-temurin:21`), and CI already target it. No Java 25 needed.
-- **3.x is end-of-life for a new build:** 3.3/3.4 are EOL and 3.5 (the last 3.x) loses OSS support
-  on 2026-06-30. A brand-new 2026 project should start on 4.0.x.
+- **Spring Boot 4.1.1 runs on Java 21** (4.1 keeps the Java 17+ baseline). Keep Java 21 LTS — the
+  whole project, Dockerfile (`eclipse-temurin:21`), and CI already target it. No Java 25 needed.
+- **4.1 is the current supported minor:** 4.1.0 went GA on 2026-06-10, and 4.1.1 (2026-08-20) is
+  its first patch, with 98 fixes. The project started on 4.0.6 and was migrated to 4.1.1 with
+  no code changes (see `docs/migration/spring-boot-4.1.1-migration-plan.md`, ADR 0005). 3.x is
+  end-of-life.
 - **Framework 7 features map onto this project:** HTTP Service Clients for the adapters, native
   `@Retryable`/`@ConcurrencyLimit` for resilience, the OpenTelemetry starter for observability,
   module-focused starters, and JSpecify null-safety.
+
+## Spring Boot 4.1 rules (keep the build upgrade-clean)
+
+- **No deprecated Boot/Framework API.** 4.1 *removed* everything deprecated in 4.0, and 4.2 will do
+  the same to 4.1 deprecations. Main and test code must compile warning-free with
+  `-Xlint:deprecation -Xlint:removal`; if an API is deprecated, use its documented replacement.
+- **Elasticsearch server = bundled client version.** Boot 4.1.1 manages the ES Java client
+  **9.4.5**, so Compose and Testcontainers use `docker.elastic.co/elasticsearch/elasticsearch:9.4.5`.
+  Never point the app at an 8.x cluster, and bump the image whenever a Boot upgrade moves the client.
+- **Managed versions:** don't pin anything the Boot BOM manages (Hibernate 7.4, Spring Security 7.1,
+  Spring Data 2026.0, Lettuce 7, Flyway 12, Jackson 3.1, Micrometer 1.17, Testcontainers 2). Pin
+  only libraries outside the BOM, such as `resilience4j-spring-boot4:2.4.0`, the MinIO Java SDK (S3 client), pgvector, JTS
+  and PDFBox.
+- **Jackson 3:** inject `tools.jackson.databind.ObjectMapper`/`JsonMapper`. Annotations stay in
+  `com.fasterxml.jackson.annotation`. Don't add the deprecated Jackson 2 bridge.
+- **Config binding:** in 4.1, constructor-bound `Optional<…>` parameters bind to `Optional.empty()`
+  (not `null`), and empty YAML maps are kept. Prefer plain nullable/defaulted record components.
+- **Lettuce 7 / Flyway 12** are the drivers under Redis Streams and migrations. Use the Spring
+  abstractions (`StringRedisTemplate`, `StreamOperations`, Flyway auto-config) rather than raw
+  driver APIs, so future driver majors stay transparent.
 
 ## Critical rules (never violate)
 
@@ -65,7 +87,7 @@ Package layout follows §7.1: `config`, `controller`, `service`, `worker`, `repo
 ```kotlin
 plugins {
     java
-    id("org.springframework.boot") version "4.0.6"
+    id("org.springframework.boot") version "4.1.1"
     id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -76,31 +98,39 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-data-redis")
     implementation("org.springframework.boot:spring-boot-starter-data-elasticsearch")
+    implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-oauth2-resource-server") // RS256 JWT
     implementation("org.springframework.boot:spring-boot-starter-actuator")
-    implementation("org.springframework.boot:spring-boot-starter-aop")          // for @Retryable / R4j
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.hibernate.orm:hibernate-spatial")                 // PostGIS geometry
     runtimeOnly("org.postgresql:postgresql")
 
-    // Resilience: native @Retryable/@ConcurrencyLimit cover retry+concurrency;
-    // Resilience4j (Boot 4 starter) adds circuit breakers + metrics for LLM/Twilio/Bhashini/ES.
-    implementation("io.github.resilience4j:resilience4j-spring-boot4")
+    // Resilience4j circuit breakers + retry metrics. Not in any BOM → pin it. AOP via spring-aspects
+    // (there is NO spring-boot-starter-aop in Boot 4; the AspectJ starter is spring-boot-starter-aspectj).
+    implementation("io.github.resilience4j:resilience4j-spring-boot4:2.4.0")
+    implementation("org.springframework:spring-aspects")
 
-    // Observability (Framework 7 first-class)
+    // Observability
+    implementation("org.springframework.boot:spring-boot-micrometer-tracing-brave")
     implementation("io.micrometer:micrometer-registry-prometheus")
-    implementation("org.springframework.boot:spring-boot-starter-opentelemetry")
 
-    testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.springframework.boot:spring-boot-starter-testcontainers")
-    testImplementation("org.testcontainers:postgresql")
-    testImplementation("org.testcontainers:elasticsearch")
+    // Tests: one -test starter per technology + Testcontainers 2 (artifacts are testcontainers-<module>)
+    testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
+    testImplementation("org.springframework.boot:spring-boot-starter-security-test")
+    testImplementation("org.springframework.boot:spring-boot-testcontainers")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers-postgresql")
+    testImplementation("org.testcontainers:testcontainers-elasticsearch")
 }
 ```
 
-> Boot 4 modularized the starters — prefer the specific `spring-boot-starter-<technology>` (e.g.
-> `spring-boot-starter-webmvc`, not the old umbrella `web` artifact) and the matching
-> `-test` starters. Gradle 9 is supported.
+> Boot 4 modularized the starters. Prefer the specific `spring-boot-starter-<technology>` (for
+> example `spring-boot-starter-webmvc`, not the old umbrella `web` artifact) and the matching
+> `-test` starters. `naukrinearby/build.gradle.kts` is the source of truth, so copy coordinates from
+> there. Gradle 9.5.1 (wrapper) is supported.
 
 ## Spring Boot 4 / Framework 7 features — used HERE
 
@@ -141,25 +171,32 @@ public interface LlmExtractionProvider {
 
 ### Native resilience + Resilience4j (§12)
 
-Boot 4 has built-in `@Retryable`, `@ConcurrencyLimit`, and `@EnableResilientMethods`. Use native
-annotations for retry/backoff and concurrency limits; reach for **Resilience4j (the
-`-spring-boot4` starter)** for circuit breakers and rich metrics.
+**Project convention:** every external provider method carries Resilience4j **`@Retry(name=…)` +
+`@CircuitBreaker(name=…)`**, configured centrally under `resilience4j.*` in `application.yml`
+(instances `llm`, `bhashini`, `twilio`, `embedding`, `elasticsearch`). Their state is exposed at
+`/actuator/circuitbreakers` and `/actuator/retries`. Follow this pattern for new providers so
+breakers, retries and metrics stay uniform.
+
+Framework 7 also ships native `@Retryable` / `@ConcurrencyLimit` (enable them with
+`@EnableResilientMethods`). Use `@ConcurrencyLimit` to bulkhead a hot path. **Never stack native
+`@Retryable` and R4j `@Retry` on the same method**, because the retries multiply.
 
 ```java
-@Service
-@RequiredArgsConstructor
-public class TranslationService {            // Bhashini, with English fallback (§9.6)
-    private final BhashiniClient bhashini;
+@Component
+@ConditionalOnProperty(name = "naukri.translation.provider", havingValue = "bhashini")
+public class BhashiniTranslationProvider implements TranslationProvider {
+    private final RestClient client;              // built in the constructor with props.timeout() (§12)
 
-    @Retryable(maxRetries = 3, delayString = "500ms", multiplier = 2.0)   // native, with backoff
-    @CircuitBreaker(name = "bhashini", fallbackMethod = "fallbackToEnglish") // Resilience4j
-    public String translate(String text, String from, String to) {
-        return bhashini.translate(new TranslationRequest(text, from, to)).text();
-    }
+    @Override
+    @Retry(name = "bhashini")                     // io.github.resilience4j.retry.annotation.Retry
+    @CircuitBreaker(name = "bhashini")            // io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker
+    public String translate(String text, String targetLanguageCode) { /* … */ }
+}
 
-    String fallbackToEnglish(String text, String from, String to, Throwable t) {
-        return text; // a clear English alert beats a failed send
-    }
+// TranslationService is the final safety net: on any failure, send English (§9.6).
+public String translateOrEnglish(String englishText, String targetLanguageCode) {
+    try { return provider.translate(englishText, targetLanguageCode); }
+    catch (Exception ex) { return englishText; } // a clear English alert beats a failed send
 }
 ```
 
@@ -191,6 +228,15 @@ public class GlobalExceptionHandler {
     ProblemDetail handleParse(ResumeParseException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
     }
+
+    // REQUIRED whenever a catch-all exists: @PreAuthorize denials reach this advice first.
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access denied");
+    }
+
+    @ExceptionHandler(Exception.class)          // last resort → 500, logged
+    ProblemDetail handleGeneric(Exception ex) { /* log.error(...) */ return ProblemDetail.forStatus(500); }
 }
 ```
 
@@ -331,31 +377,53 @@ Surface custom metrics the Grafana panels expect (`search_duration_seconds`,
 
 ## Testing (Testcontainers + RestTestClient)
 
+Containers are declared **once** as `@Bean`s in `TestcontainersConfiguration` (shared by every test
+and by `TestNaukriNearbyApplication` for local dev) and imported. Don't declare per-class
+`@Container` fields.
+
 ```java
+@TestConfiguration(proxyBeanMethods = false)
+class TestcontainersConfiguration {
+    @Bean @ServiceConnection
+    ElasticsearchContainer elasticsearchContainer() {      // org.testcontainers.elasticsearch
+        return new ElasticsearchContainer(DockerImageName.parse(
+                "docker.elastic.co/elasticsearch/elasticsearch:9.4.5"))   // = Boot-managed ES client
+                .withEnv("xpack.security.enabled", "false");
+    }
+
+    @Bean @ServiceConnection
+    PostgreSQLContainer postgresContainer() {              // TC2: org.testcontainers.postgresql, NOT generic
+        String image = new ImageFromDockerfile("naukrinearby/postgres-test:16", false)
+                .withFileFromPath("Dockerfile", Path.of("docker/postgres/Dockerfile")).get(); // PostGIS+pgvector
+        return new PostgreSQLContainer(DockerImageName.parse(image).asCompatibleSubstituteFor("postgres"));
+    }
+
+    @Bean @ServiceConnection(name = "redis")
+    GenericContainer<?> redisContainer() {
+        return new GenericContainer<>(DockerImageName.parse("redis:7-alpine")).withExposedPorts(6379);
+    }
+    // Object storage (RustFS 1.0.1, S3-compatible) has no @ServiceConnection → DynamicPropertyRegistrar bean.
+}
+
+@Import(TestcontainersConfiguration.class)
+@ActiveProfiles("test")                                   // all providers stubbed, no external APIs
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@Testcontainers
-class JobSearchIntegrationTest {
-
-    @Container @ServiceConnection
-    static PostgreSQLContainer<?> pg = new PostgreSQLContainer<>("postgis/postgis:16-3.4-alpine");
-
-    @Container @ServiceConnection
-    static ElasticsearchContainer es =
-            new ElasticsearchContainer("docker.elastic.co/elasticsearch/elasticsearch:8.13.0");
-
-    @Autowired RestTestClient client;   // Boot 4's modern test client
+class JobSearchIntegrationTests {
+    @LocalServerPort int port;
 
     @Test
     void searchReturnsNearbyJobs() {
-        client.get().uri("/api/jobs/search?lat=22.72&lng=75.85&radius=5km")
+        RestTestClient client = RestTestClient.bindToServer().baseUrl("http://localhost:" + port).build();
+        client.get().uri("/api/jobs/search?lat=22.72&lng=75.85&radius=5")
               .exchange().expectStatus().isOk();
     }
 }
 ```
 
-`@ServiceConnection` auto-wires container connection details — no manual `@DynamicPropertySource`.
-Use `RestTestClient` (Boot 4) rather than the older `WebTestClient`/`MockMvc` ceremony for HTTP-layer
-tests.
+`@ServiceConnection` wires the container connection details, so no manual `@DynamicPropertySource`
+is needed. Use `RestTestClient` (`org.springframework.test.web.servlet.client`) for HTTP-layer tests
+rather than the older `WebTestClient`/`MockMvc` ceremony. Mock beans with `@MockitoBean`; `@MockBean`
+is gone. Run `./gradlew build` (it needs a Docker daemon) before calling a change done.
 
 ## Anti-patterns to fix on sight
 
@@ -366,7 +434,10 @@ tests.
 | `@Transactional` on controller or private method | put it on a public service method |
 | Dual write to Postgres + ES | transactional outbox + idempotent sync worker |
 | `RestTemplate`/`WebClient` boilerplate per provider | `@HttpExchange` HTTP Service Client |
-| Hand-rolled retry loops | native `@Retryable`; `@CircuitBreaker` (Resilience4j) for breakers |
+| Hand-rolled retry loops | R4j `@Retry` + `@CircuitBreaker` (project convention), configured in YAML |
+| Deprecated Boot/Framework API, `@MockBean`, Jackson 2 `com.fasterxml.jackson.databind` | the non-deprecated replacement, `@MockitoBean`, `tools.jackson.databind` |
+| ES 8.x image / version drift from the Boot-managed ES client | `elasticsearch:9.4.5` in Compose **and** Testcontainers |
+| Pinning a Boot-managed dependency version | drop the version and let the Boot BOM manage it |
 | Scattered `@Value` | `@ConfigurationProperties` record |
 | `ResponseEntity<ErrorResponse>` ad-hoc errors | `ProblemDetail` via `@RestControllerAdvice` |
 | Mapping lazy entities in a loop | `JOIN FETCH` / `@EntityGraph` / DTO projection |
@@ -374,8 +445,10 @@ tests.
 
 ## Quick reference
 
-- Versions: Spring Boot **4.0.6**, Spring Framework 7, Java 21, Gradle 9.
-- Adapters → `@HttpExchange`; resilience → native `@Retryable` + Resilience4j `@CircuitBreaker`.
+- Versions: Spring Boot **4.1.1**, Spring Framework 7.0.9, Spring Security 7.1, Hibernate 7.4,
+  ES client/server **9.4.5**, Java 21, Gradle 9.5.1, `resilience4j-spring-boot4` 2.4.0.
+- Upgrade hygiene: no deprecated APIs (`-Xlint:deprecation`), no pinned Boot-managed versions.
+- Adapters → `@HttpExchange`/`RestClient`; resilience → Resilience4j `@Retry` + `@CircuitBreaker`.
 - Consistency → transactional outbox (never dual writes); idempotent ES upsert on `job_id`.
 - Errors → `ProblemDetail`; config → `@ConfigurationProperties`; null-safety → JSpecify.
 - Tests → Testcontainers + `@ServiceConnection` + `RestTestClient`.
