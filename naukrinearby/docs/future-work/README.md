@@ -12,9 +12,9 @@ already accommodates them behind existing seams (provider adapters, the outbox, 
   `naukri.embedding.provider=remote`. The local deterministic provider remains the offline default.
 
 ## Resilience hardening
-- Replace the explicit retry/fallback helpers with a circuit-breaker library once one targets Spring
-  Boot 4 (the `resilience4j-spring-boot4` starter does not exist yet on Maven Central). Native Spring
-  Framework 7 `@Retryable` / `@ConcurrencyLimit` can also be adopted for declarative retries.
+- Done: external providers use `resilience4j-spring-boot4` (2.4.0, verified on Spring Boot 4.1.1)
+  `@Retry` + `@CircuitBreaker`. Next step: bulkhead the resume-parse path with Framework 7
+  `@ConcurrencyLimit` so parse load can't starve WhatsApp delivery.
 
 ## Bharat differentiators (G-features)
 - G1 voice-first / IVR application flow, G2 vernacular UX, G4+ trust & verification signals.

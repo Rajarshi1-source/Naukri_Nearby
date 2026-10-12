@@ -5,6 +5,7 @@ import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,6 +28,15 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(ForbiddenException.class)
 	ProblemDetail handleForbidden(ForbiddenException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, ex.getMessage());
+	}
+
+	/**
+	 * {@code @PreAuthorize} denials surface as {@link AccessDeniedException} inside the MVC call, so
+	 * without this they would fall through to the catch-all below and become a 500.
+	 */
+	@ExceptionHandler(AccessDeniedException.class)
+	ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+		return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, "Access denied");
 	}
 
 	@ExceptionHandler(RateLimitException.class)

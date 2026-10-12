@@ -194,6 +194,22 @@ class ApiEndpointsIntegrationTests {
 	}
 
 	@SuppressWarnings("unchecked")
+	@Test
+	void candidate_cannotPostJob_getsForbiddenProblemDetail() {
+		RestTestClient client = client();
+		String candidateToken = token(client, nextPhone(), "CANDIDATE");
+
+		// @PreAuthorize denial must be a 403 ProblemDetail, not the catch-all 500.
+		client.post().uri("/api/jobs")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + candidateToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(jobBody())
+				.exchange()
+				.expectStatus().isForbidden()
+				.expectBody()
+				.jsonPath("$.status").isEqualTo(403);
+	}
+
 	private String token(RestTestClient client, String phone, String role) {
 		client.post().uri("/api/auth/send-otp")
 				.contentType(MediaType.APPLICATION_JSON)

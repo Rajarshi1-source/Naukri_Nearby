@@ -22,7 +22,7 @@ class TestcontainersConfiguration {
 	@SuppressWarnings("resource")
 	ElasticsearchContainer elasticsearchContainer() {
 		return new ElasticsearchContainer(
-				DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:9.2.8"))
+				DockerImageName.parse("docker.elastic.co/elasticsearch/elasticsearch:9.4.5"))
 				.withEnv("xpack.security.enabled", "false")
 				.withEnv("ES_JAVA_OPTS", "-Xms512m -Xmx512m");
 	}
@@ -48,22 +48,24 @@ class TestcontainersConfiguration {
 
 	@Bean
 	@SuppressWarnings("resource")
-	GenericContainer<?> minioContainer() {
-		return new GenericContainer<>(DockerImageName.parse("minio/minio:latest"))
+	GenericContainer<?> objectStorageContainer() {
+		// RustFS: S3-compatible resume store (ADR 0006). The test-only SSE master key lets
+		// ObjectStorageIntegrationTests cover encryption at rest (naukri.storage.encryption=sse).
+		return new GenericContainer<>(DockerImageName.parse("rustfs/rustfs:1.0.1"))
 				.withExposedPorts(9000)
-				.withEnv("MINIO_ROOT_USER", "minioadmin")
-				.withEnv("MINIO_ROOT_PASSWORD", "minioadmin")
-				.withCommand("server", "/data")
-				.waitingFor(Wait.forHttp("/minio/health/ready").forPort(9000)
+				.withEnv("RUSTFS_ACCESS_KEY", "minioadmin")
+				.withEnv("RUSTFS_SECRET_KEY", "minioadmin")
+				.withEnv("RUSTFS_SSE_S3_MASTER_KEY", "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=")
+				.waitingFor(Wait.forHttp("/health").forPort(9000)
 						.withStartupTimeout(Duration.ofSeconds(60)));
 	}
 
-	/** MinIO has no @ServiceConnection support, so wire its endpoint/credentials dynamically. */
+	/** Object storage has no @ServiceConnection support, so wire its endpoint/credentials dynamically. */
 	@Bean
-	DynamicPropertyRegistrar minioProperties(GenericContainer<?> minioContainer) {
+	DynamicPropertyRegistrar objectStorageProperties(GenericContainer<?> objectStorageContainer) {
 		return registry -> {
 			registry.add("naukri.storage.endpoint",
-					() -> "http://" + minioContainer.getHost() + ":" + minioContainer.getMappedPort(9000));
+					() -> "http://" + objectStorageContainer.getHost() + ":" + objectStorageContainer.getMappedPort(9000));
 			registry.add("naukri.storage.access-key", () -> "minioadmin");
 			registry.add("naukri.storage.secret-key", () -> "minioadmin");
 		};

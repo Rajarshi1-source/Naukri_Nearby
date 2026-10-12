@@ -30,7 +30,7 @@ services:
       retries: 5
 
   elasticsearch:
-    image: 'docker.elastic.co/elasticsearch/elasticsearch:9.2.8'
+    image: 'docker.elastic.co/elasticsearch/elasticsearch:9.4.5'
     environment:
       - discovery.type=single-node
       - xpack.security.enabled=false
@@ -45,19 +45,25 @@ services:
       timeout: 10s
       retries: 5
 
-  minio:
-    image: 'minio/minio:latest'
+  # S3-compatible object storage for resumes (see ADR 0006). RustFS replaced MinIO, whose community
+  # images were withdrawn from Docker Hub in Sept 2026. The app still talks to it with the MinIO Java
+  # SDK and the MINIO_* settings, since both are plain S3 clients/config and the wire API is unchanged.
+  rustfs:
+    image: 'rustfs/rustfs:1.0.1'
     environment:
-      - MINIO_ROOT_USER=minioadmin
-      - MINIO_ROOT_PASSWORD=minioadmin
+      - RUSTFS_ACCESS_KEY=minioadmin
+      - RUSTFS_SECRET_KEY=minioadmin
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_CONSOLE_ADDRESS=:9001
+      # Set to a base64-encoded 32-byte key to allow SSE-S3 (STORAGE_ENCRYPTION=sse).
+      - RUSTFS_SSE_S3_MASTER_KEY=${RUSTFS_SSE_S3_MASTER_KEY:-}
     ports:
       - '9000:9000'
       - '9001:9001'
-    command: server /data --console-address ":9001"
     volumes:
-      - minio_data:/data
+      - rustfs_data:/data
     healthcheck:
-      test: ['CMD', 'mc', 'ready', 'local']
+      test: ['CMD', 'curl', '-sf', 'http://localhost:9000/health']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -131,6 +137,6 @@ volumes:
   postgres_data:
   redis_data:
   es_data:
-  minio_data:
+  rustfs_data:
   grafana_data:
   langfuse_db_data:

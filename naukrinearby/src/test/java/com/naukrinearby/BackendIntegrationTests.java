@@ -26,6 +26,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.client.RestTestClient;
@@ -110,14 +111,27 @@ class BackendIntegrationTests {
 				.exchange()
 				.expectStatus().isOk();
 
-		client.post().uri("/api/auth/verify-otp")
+		Map<?, ?> auth = client.post().uri("/api/auth/verify-otp")
 				.contentType(MediaType.APPLICATION_JSON)
 				.body(Map.of("phone", phone, "code", "123456", "role", "CANDIDATE"))
 				.exchange()
 				.expectStatus().isOk()
+				.expectBody(Map.class)
+				.returnResult().getResponseBody();
+		assertThat(auth.get("role")).isEqualTo("CANDIDATE");
+		assertThat(auth.get("accessToken")).isNotNull();
+
+		client.get().uri("/api/auth/me")
+				.header(HttpHeaders.AUTHORIZATION, "Bearer " + auth.get("accessToken"))
+				.exchange()
+				.expectStatus().isOk()
 				.expectBody()
-				.jsonPath("$.accessToken").exists()
 				.jsonPath("$.role").isEqualTo("CANDIDATE");
+
+		// No token → 401 (was a 500: /api/auth/** was permitAll, so /me ran with a null principal).
+		client.get().uri("/api/auth/me")
+				.exchange()
+				.expectStatus().isUnauthorized();
 	}
 
 	private JobCreateRequest sampleJob() {

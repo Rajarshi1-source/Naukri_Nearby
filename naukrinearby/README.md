@@ -1,6 +1,6 @@
 # NaukriNearby — Backend MVP
 
-Hyperlocal job board backend on **Spring Boot 4.0.6 / Java 21 / Gradle**. Implements phone+OTP→JWT
+Hyperlocal job board backend on **Spring Boot 4.1.1 / Java 21 / Gradle**. Implements phone+OTP→JWT
 auth, geotagged jobs with a transactional PostgreSQL→Elasticsearch outbox, real-LLM resume parsing
 wired to a Python eval harness, Elasticsearch geo-search with a PostGIS fallback, pgvector matching,
 and an idempotent WhatsApp alert pipeline (Twilio/Bhashini stubbed).
@@ -16,12 +16,12 @@ and an idempotent WhatsApp alert pipeline (Twilio/Bhashini stubbed).
 
 ## Datastores
 - PostgreSQL 16 + **PostGIS** + **pgvector** (source of truth) — built from `docker/postgres/Dockerfile`.
-- Elasticsearch 9.2 (derived search index), Redis 7 (cache/streams/idempotency), MinIO (resumes).
+- Elasticsearch 9.4 (derived search index), Redis 7 (cache/streams/idempotency), RustFS (S3-compatible resume storage).
 
 ## Run locally
 ```bash
 # 1. Infra
-docker compose up -d          # postgres(+postgis+pgvector), elasticsearch, redis, minio
+docker compose up -d          # postgres(+postgis+pgvector), elasticsearch, redis, rustfs
 
 # 2. Config — copy and fill in (real LLM key for meaningful extraction)
 cp .env.example .env          # set LLM_API_KEY; defaults match compose

@@ -108,8 +108,8 @@ naukri:
 | **Frontend** | Next.js 16 (App Router) + React 19.2 + TypeScript | SSR for SEO (job listings must be Google-indexed). Server components for faster loads on slow Tier-2/3 networks. TS prevents bugs at scale. Next.js 16 (current stable; 14 is EOL) on Node.js 24 LTS, Turbopack default. |
 | **UI Library** | Tailwind CSS + shadcn/ui | Rapid prototyping; accessible, production-grade components; no CSS bloat. |
 | **Maps** | Leaflet.js (OpenStreetMap) | Free (no Google Maps billing). Excellent India coverage. 42KB vs Google Maps 200KB+ — crucial for slow networks. |
-| **Backend** | Spring Boot 4.0.6 (Java 21) | Dominant in Bangalore product companies. Current Spring generation (Framework 7): virtual threads for concurrent external API calls, `@HttpExchange` HTTP Service Clients for the provider adapters (§2), native `@Retryable`/`@ConcurrencyLimit` + Resilience4j for resilience (§12). Java 21 LTS is fully supported on 4.0.6 (Java 17–26 range). |
-| **Search Engine** | Elasticsearch 8.x | geo_distance + full-text with analyzers for Hindi/regional text; relevance scoring blends proximity + skill match. |
+| **Backend** | Spring Boot 4.1.1 (Java 21) | Dominant in Bangalore product companies. Current Spring generation (Framework 7): virtual threads for concurrent external API calls, `@HttpExchange` HTTP Service Clients for the provider adapters (§2), native `@Retryable`/`@ConcurrencyLimit` + Resilience4j for resilience (§12). Java 21 LTS is fully supported on 4.1.1 (Java 17–26 range). Started on 4.0.6 and migrated to 4.1.1 with no code changes — see `docs/migration/spring-boot-4.1.1-migration-plan.md`. |
+| **Search Engine** | Elasticsearch 9.4 (server pinned to the Boot-managed Java client, 9.4.5) | geo_distance + full-text with analyzers for Hindi/regional text; relevance scoring blends proximity + skill match. |
 | **Primary DB** | PostgreSQL 16 + PostGIS + pgvector | See §8. Relational integrity + geospatial + vectors in one DB. |
 | **Vector Search** | pgvector (PostgreSQL extension) | Stores skill embeddings; cosine similarity search. No separate vector DB at MVP scale. |
 | **Cache + Queue** | Redis 7 | OTP, session/search cache, rate limiting, Redis Streams queues. See §10. |
@@ -126,7 +126,7 @@ naukri:
 | Rejected Option | Why |
 |---|---|
 | Express.js/Node backend | Spring Boot preferred by Bangalore companies; virtual threads outperform Node's event loop for concurrent external calls. |
-| **Spring Boot 3.x** | 3.3/3.4 are EOL and 3.5 (the last 3.x) loses OSS support on 2026-06-30 — starting a brand-new 2026 build on a dying branch is a weak interview signal. Spring Boot 4.0.6 (Apr 2026, 6th patch — stable) runs on Java 21 (Java 17–26) and is supported into 2027, with Framework 7 features (HTTP Service Clients, native resilience, OpenTelemetry starter) that map directly onto this design. |
+| **Spring Boot 3.x** | 3.3/3.4 are EOL and 3.5 (the last 3.x) loses OSS support on 2026-06-30 — starting a brand-new 2026 build on a dying branch is a weak interview signal. Spring Boot 4.1.1 (Aug 2026, first patch of the current 4.1 line; the project started on 4.0.6) runs on Java 21 (Java 17–26) and is supported to 2027-07, with Framework 7 features (HTTP Service Clients, native resilience, OpenTelemetry starter) that map directly onto this design. |
 | MongoDB | Deeply relational data (users → resumes → applications → jobs). PostGIS beats 2dsphere; pgvector removes the need for a separate vector DB. |
 | Pinecone/Weaviate | Separate vector DB is overengineering for MVP. pgvector handles ~1M vectors efficiently. Migrate later if needed. |
 | Firebase/Supabase | No Elasticsearch integration; limited geospatial; vendor lock-in. |
@@ -506,7 +506,7 @@ public class NotificationService {
 | **ACID** | Full | Single-doc only | Eventual | Full | Configurable |
 | **Operational Cost** | Low (1 DB for all 3) | Medium | High (3+ nodes) | Low | High (cloud-only) |
 
-### VERDICT: PostgreSQL 16 + PostGIS 3.4 + pgvector
+### VERDICT: PostgreSQL 16 + PostGIS 3.6 + pgvector 0.8 (image: `naukrinearby/docker/postgres` — pgvector/pgvector:pg16-bookworm + PGDG PostGIS)
 
 1. **One database, three capabilities:** relational + geospatial + vector. Any other choice needs 2–3 databases.
 2. **PostGIS is the geospatial gold standard:** "jobs within 5 km" is one `ST_DWithin`; supports Indian district/pincode polygons.
@@ -829,7 +829,7 @@ class RecencyFirstStrategy implements SearchRankingStrategy { /* 0.3 geo + 0.3 s
 
 ## 14. Docker & Kubernetes
 
-> **Backend runtime:** the image builds a **Spring Boot 4.0.6** (Spring Framework 7) application with **Gradle 9** on the Java 21 LTS Temurin base shown below. Spring Boot 4.0.6 supports Java 17–26, so the `eclipse-temurin:21` images are correct and unchanged — only the framework generation moved from 3.x to 4.0.6.
+> **Backend runtime:** the image builds a **Spring Boot 4.1.1** (Spring Framework 7) application with **Gradle 9** on the Java 21 LTS Temurin base shown below. Spring Boot 4.1.1 supports Java 17–26, so the `eclipse-temurin:21` images are correct and unchanged.
 
 ### 14.1 Dockerfiles
 
@@ -938,7 +938,7 @@ services:
       timeout: 5s
       retries: 5
   elasticsearch:
-    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.4.5
     ports: ["9200:9200"]
     environment:
       - discovery.type=single-node
@@ -1050,7 +1050,7 @@ Separate the **notification + sync workers** into their own Deployment that auto
 
 ## 16. CI/CD Pipeline — GitHub Actions
 
-> **Toolchain:** CI builds the backend with **Gradle 9** and **Java 21** against **Spring Boot 4.0.6** (Spring Framework 7). The `setup-java` step stays on Java 21 — fully supported on 4.0.6 — so no workflow change is needed beyond the dependency/version bump in `build.gradle.kts`.
+> **Toolchain:** CI builds the backend with **Gradle 9** and **Java 21** against **Spring Boot 4.1.1** (Spring Framework 7). The `setup-java` step stays on Java 21 — fully supported on 4.1.1 — so no workflow change is needed beyond the dependency/version bump in `build.gradle.kts`.
 
 ```yaml
 # .github/workflows/deploy.yml
@@ -1075,7 +1075,7 @@ jobs:
         ports: [6379:6379]
         options: --health-cmd "redis-cli ping" --health-interval 10s
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.13.0
+        image: docker.elastic.co/elasticsearch/elasticsearch:9.4.5
         env: {discovery.type: single-node, xpack.security.enabled: false, ES_JAVA_OPTS: "-Xms256m -Xmx256m"}
         ports: [9200:9200]
         options: --health-cmd "curl -f http://localhost:9200" --health-interval 15s
@@ -1257,8 +1257,8 @@ hyperlocal job discovery to their phones with WhatsApp-first alerts in regional 
 - SEO job pages (Next.js SSR + JSON-LD) · phone+OTP auth
 
 ## Tech Stack
-Next.js 16 (React 19.2) · Spring Boot 4.0.6 (Java 21) · PostgreSQL 16 + PostGIS + pgvector ·
-Elasticsearch 8 · Redis 7 · LLM adapter (GPT-5-mini-class) · bge-m3 embeddings ·
+Next.js 16 (React 19.2) · Spring Boot 4.1.1 (Java 21) · PostgreSQL 16 + PostGIS + pgvector ·
+Elasticsearch 9.4 · Redis 7 · LLM adapter (GPT-5-mini-class) · bge-m3 embeddings ·
 Bhashini · Twilio WhatsApp · Langfuse · Docker · GitHub Actions · Prometheus + Grafana
 
 ## Architecture Decisions
