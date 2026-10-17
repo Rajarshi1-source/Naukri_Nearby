@@ -7,6 +7,8 @@ description: >-
   posting / alert-preference forms — or whenever the user mentions Tailwind, shadcn, Radix,
   components.json, the cn() helper, theming/CSS variables, dark mode, accessibility (a11y),
   responsive/mobile layout, react-hook-form + zod forms, or "make this look good / less generic."
+  Also trigger for TrustBadge, ModerationNotice, ReportJobButton, SkillGapPanel, LanguageSwitcher,
+  OfflineBanner, VoiceSearchButton, and Devanagari typography.
   Trigger even without an explicit ask when styling decisions are being made. MANDATE: shadcn/ui
   components are copied INTO the repo (components/ui) and edited there — never installed as an npm
   dependency; preserve Radix accessibility; theme via tokens, not hardcoded colors; design
@@ -130,6 +132,18 @@ Validation errors render through `<FormMessage>` with proper `aria-describedby` 
 | `LoadingSkeleton` | `Skeleton` | match the real layout (card, list, map) |
 | `EmptyState` | `Card` + icon | friendly copy + a clear next action |
 | Dashboards | `Table`, `Tabs`, `Card` | responsive; horizontal scroll for tables on mobile |
+| `TrustBadge` | `Badge` + lucide `ShieldCheck`/`Phone`/`ShieldAlert` | `BUSINESS_VERIFIED` → `bg-success/10 text-success`; `PHONE_VERIFIED` → `secondary`; `UNVERIFIED` → `outline` + muted. Always icon **and** text (never color alone) |
+| `ModerationNotice` | `Card` with `border-warning` token | employer-only: "Under review" + the risk reasons as a list |
+| `ReportJobButton` | `Button variant="ghost" size="sm"` + native `<dialog>` or `Select` for the reason | destructive styling only on the confirm button |
+| `SkillGapPanel` | `Card` + `SkillTag`s | matched skills `secondary`, missing skills `outline`; portal links as `Button variant="link"` |
+| `LanguageSwitcher` | `Select` | label each option in its own script ("English", "हिंदी"); `lang` attr on each option |
+| `OfflineBanner` | full-width bar, `bg-warning/15 text-foreground`, `role="status"` | sticky under the header; never covers content |
+| `VoiceSearchButton` | `Button size="icon"` + lucide `Mic`/`MicOff` | `aria-pressed` while listening; hidden when unsupported |
+
+Devanagari text needs room: keep `leading-relaxed` on body copy, avoid `uppercase`/`tracking-wide`
+on translated strings, and let buttons grow (`h-auto min-h-11`) instead of truncating Hindi labels.
+Add `success` and `warning` semantic tokens in `globals.css` (light and dark) rather than raw
+greens/ambers.
 
 ## Mobile-first + slow-network discipline
 

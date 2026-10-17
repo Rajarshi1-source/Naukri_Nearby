@@ -9,7 +9,11 @@ description: >-
   config, error handling, or tests — even when the version isn't named. Trigger on Spring Boot,
   Spring Framework 7, @HttpExchange / HTTP Service Clients, native @Retryable / @ConcurrencyLimit,
   Resilience4j, ProblemDetail, @Transactional, Spring Data JPA, Testcontainers, RestTestClient,
-  Actuator/Micrometer/OpenTelemetry, virtual threads, or Gradle. MANDATE: Spring Boot 4.1.1 +
+  Actuator/Micrometer/OpenTelemetry, virtual threads, or Gradle. Also trigger on the Bharat
+  differentiators: fake-job/fraud risk scoring, moderation queue, job reports, trust levels and
+  GSTIN verification, IVR/voice apply (Twilio Voice TwiML), WhatsApp-first apply, Hinglish query
+  normalization, skill-gap recommendations, DPDP consent ledger and data export, Langfuse
+  LlmTracer, and the @ConcurrencyLimit parse bulkhead. MANDATE: Spring Boot 4.1.1 +
   Java 21 + Gradle — never generate 3.x code, APIs deprecated in 4.0 (removed in 4.1), or Java 25
   code. Pair with naukrinearby-java21 for language concerns.
 ---
@@ -438,6 +442,48 @@ is needed. Use `RestTestClient` (`org.springframework.test.web.servlet.client`) 
 rather than the older `WebTestClient`/`MockMvc` ceremony. Mock beans with `@MockitoBean`; `@MockBean`
 is gone. Run `./gradlew build` (it needs a Docker daemon) before calling a change done.
 
+## Bharat differentiators — implementation patterns
+
+The differentiator milestone (`docs/plans/differentiators-implementation-plan.md`, ADRs 0007–0009)
+adds these backend pieces. Follow the names and rules exactly; they are what the frontend, tests,
+and runbook expect.
+
+| Feature | Classes (package `com.naukrinearby…`) | Config / endpoints |
+|---|---|---|
+| Fraud scoring | `service.trust.JobRiskScorer` → `RiskAssessment(int score, List<String> reasons)` (record). Pure CPU, no network. Phrase lists in `resources/trust/payment-phrases.txt` (English, Hinglish, Devanagari; one per line, `#` comments) | `naukri.trust.review-threshold` (default 50) |
+| Moderation | `Job.moderationStatus` (`ModerationStatus` enum: `APPROVED`, `PENDING_REVIEW`, `REJECTED`), `riskScore`, `riskReasons` (`text[]`); `service.ModerationService` | `GET /api/admin/moderation/jobs`, `POST /api/admin/moderation/jobs/{id}/decision` (ROLE_ADMIN) |
+| Reports | `JobReport` entity, `UNIQUE(job_id, reporter_id)`; `ModerationService.report(...)` | `POST /api/jobs/{id}/report`; `naukri.trust.report-threshold` (default 3) |
+| Trust levels | `service.trust.GstVerifier` port: `ChecksumGstVerifier` (`checksum`, default, GSTIN format + mod-36 check digit) / `NoopGstVerifier` (`none`); `TrustLevel` enum `UNVERIFIED`, `PHONE_VERIFIED`, `BUSINESS_VERIFIED` | `naukri.trust.gst-verifier`; `GET/PUT /api/employer/profile` |
+| Admin bootstrap | `AuthService` gives `ROLE_ADMIN` to phones listed in `naukri.admin.phones` at OTP verify | `NAUKRI_ADMIN_PHONES` |
+| Query normalization | `service.search.QueryNormalizer` loads `resources/lexicon/hinglish.tsv` (`variant<TAB>canonical`), used by `SearchService` (ES + PostGIS fallback) and `SkillGapService` | — |
+| Skill gap | `service.SkillGapService` → `SkillGapResponse(matched, missing, suggestions)`; portals from `resources/trust/learning-portals.yml` (official portals only, never invented course URLs) | `GET /api/candidate/jobs/{id}/skill-gap` |
+| DPDP consent + export | `Consent` entity (append-only ledger, latest row per purpose wins), `ConsentPurpose` enum `RESUME_PROCESSING`, `WHATSAPP_ALERTS`; `service.ConsentService`; export in `AccountService` | `GET/PUT /api/candidate/consents`, `GET /api/candidate/account/export` |
+| Language | `PUT /api/auth/me/language` updates `users.preferred_language` (`en`, `hi`, …) | — |
+| IVR apply | `service.IvrService` (Redis state `ivr:call:{CallSid}`, TTL 15 min), `controller.IvrController`; TwiML built by `util.TwiML` (shared with the WhatsApp reply) | `POST /api/webhooks/twilio/voice`, `POST /api/webhooks/twilio/voice/gather` |
+| Parse bulkhead | `@EnableResilientMethods` on a config class; `@ConcurrencyLimit` on the resume-parse entry point | `naukri.resume.parse-concurrency` (default 4) |
+| LLM tracing | `generation.LlmTracer` port: `LogLlmTracer` (`log`), `LangfuseLlmTracer` (`langfuse`, ingestion API, async, failures swallowed), `NoopLlmTracer` (`none`, default) | `naukri.llm-trace.*` (`LLM_TRACER`, `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`) |
+
+Rules:
+
+- **Moderation never bypasses the outbox.** A moderation decision or report escalation changes the
+  job row, bumps `version`, and writes an outbox event in the same transaction. `OutboxSyncWorker`
+  **deletes** the ES document when the payload's `moderationStatus` is not `APPROVED`. Every public
+  read path (ES search, PostGIS fallback, `GET /api/jobs/{slug}`, recommendations) shows only
+  `APPROVED` + `ACTIVE` jobs; the owning employer and admins may read their own pending jobs.
+- **Scoring is synchronous and offline.** Never call an external API from `JobRiskScorer`; a future
+  ML scorer goes behind the same type and runs async.
+- **Candidates never see the numeric risk score.** Public DTOs expose `trustLevel` and
+  `employerSince` only; risk reasons go to the employer (their own job) and admins.
+- **Webhooks:** every Twilio webhook (status, inbound message, voice) verifies
+  `X-Twilio-Signature` before doing anything, and returns TwiML escaped through `util.TwiML`
+  (`HtmlUtils.htmlEscape(text, "UTF-8")`). Never concatenate raw user text into XML.
+- **Regex on user input** must be linear: bounded quantifiers (`\D{0,20}`), no nested `.*`, and a
+  length cap on the input before matching (CodeQL `java/polynomial-redos`).
+- **No PII in traces or logs:** `LlmTracer` sends provider, model, prompt version, latency, JSON
+  validity, and character counts only; phones go through `PiiRedactor`.
+- **Migrations are expand-only** for this milestone (`V5__trust_and_moderation.sql`,
+  `V6__consents.sql`): nullable or defaulted columns, new tables, no renames or drops.
+
 ## Anti-patterns to fix on sight
 
 | Anti-pattern | Fix |
@@ -456,6 +502,10 @@ is gone. Run `./gradlew build` (it needs a Docker daemon) before calling a chang
 | Mapping lazy entities in a loop | `JOIN FETCH` / `@EntityGraph` / DTO projection |
 | Returning Spring Data `Page<T>` from a controller | `PageResponse.from(page, Dto::from)` (stable JSON, no PageImpl warning) |
 | Hardcoded API keys | env-bound `@ConfigurationProperties` |
+| Writing ES directly on a moderation decision | update the row + outbox event; the sync worker deletes/upserts |
+| String-concatenated TwiML/XML with user text | `util.TwiML` (escaped) |
+| Unbounded regex (`\D*`, `.*x.*`) on request input | bounded quantifiers + input length cap |
+| Sending resume text or phone numbers to Langfuse/logs | metadata-only `LlmTracer`, `PiiRedactor` |
 
 ## Quick reference
 
@@ -470,3 +520,5 @@ is gone. Run `./gradlew build` (it needs a Docker daemon) before calling a chang
   error shapes) → `references/security-and-api.md`.
 - Virtual threads on (`spring.threads.virtual.enabled=true`); language-level details in
   naukrinearby-java21.
+- Differentiators (fraud/moderation, trust, IVR, skill gap, consent, query normalization,
+  `@ConcurrencyLimit`, `LlmTracer`) → "Bharat differentiators" section above and ADRs 0007–0009.

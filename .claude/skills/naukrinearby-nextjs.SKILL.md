@@ -11,7 +11,11 @@ description: >-
   Turbopack, Cache Components / "use cache", cacheLife / cacheTag, revalidateTag / updateTag /
   refresh, React Compiler, React 19.2, Suspense/streaming, loading.tsx/error.tsx, TanStack React
   Query, Zod validation, discriminated unions, dynamic import of Leaflet, useGeolocation, or
-  next.config standalone output. MANDATE: Next.js 16 App Router + React 19.2 + TypeScript strict on
+  next.config standalone output. Also trigger on the Bharat differentiators: Hindi/vernacular UI
+  (i18n dictionaries, nn_lang cookie, LanguageSwitcher), offline-first PWA (manifest, service
+  worker, IndexedDB apply queue, offline banner), voice search (Web Speech API), trust badges,
+  report-job, skill-gap panel, consent/export/delete in the candidate dashboard, employer and
+  admin moderation dashboards, and Playwright E2E tests. MANDATE: Next.js 16 App Router + React 19.2 + TypeScript strict on
   Node.js 24 LTS — do NOT generate Pages Router code, do NOT generate Next.js 14/15-era synchronous
   params/cookies/headers access, and keep components Server-first. Pair with
   naukrinearby-tailwind-shadcn for styling.
@@ -232,14 +236,14 @@ import { NextResponse, type NextRequest } from "next/server";
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("nn_session")?.value;
   const path = request.nextUrl.pathname;
-  const guarded = path.startsWith("/candidate") || path.startsWith("/employer");
+  const guarded = ["/candidate", "/employer", "/admin"].some((p) => path.startsWith(p));
   if (guarded && !token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/candidate/:path*", "/employer/:path*"] };
+export const config = { matcher: ["/candidate/:path*", "/employer/:path*", "/admin/:path*"] };
 ```
 
 (The `@next/codemod upgrade` codemod renames `middleware`→`proxy` automatically if migrating an
@@ -326,8 +330,7 @@ type ParseState =
   changes) — fewer bytes per navigation, which helps budget phones.
 - Optionally enable the **stable React Compiler** (`reactCompiler: true` + `babel-plugin-react-compiler`)
   to auto-memoize and cut re-renders; it is off by default and adds build time, so measure first.
-- An **offline-first PWA** (service worker caches the job feed, queues applications offline) is a
-  planned Bharat differentiator (§19/G2) — structure data fetching so it can later be cached/queued.
+- The **offline-first PWA** is built (ADR 0009) — see "Bharat differentiators" below.
 
 ```ts
 // next.config.ts
@@ -343,11 +346,68 @@ const nextConfig: NextConfig = {
 export default nextConfig;
 ```
 
+## Bharat differentiators (ADR 0009, plan `docs/plans/differentiators-implementation-plan.md`)
+
+### Vernacular UX (i18n without a framework)
+- Dictionaries in `src/i18n/`: `en.ts` exports `const en = {...} as const` and `type Dictionary`
+  (deep-widened to `string`); `hi.ts` is `export const hi: Dictionary = {...}`, so a missing Hindi
+  key is a **compile error**. `src/i18n/index.ts` exports `LOCALES`, `DEFAULT_LOCALE`, `getDictionary`.
+- Locale lives in the `nn_lang` cookie (1 year, `SameSite=Lax`). Server Components read it with
+  `await cookies()` via `src/i18n/server.ts#getLocale()`; the root layout sets `<html lang>` and passes
+  the dictionary to `I18nProvider` (Client). Client Components call `useT()`.
+- `LanguageSwitcher` writes the cookie, calls `router.refresh()`, and (when signed in) `PUT
+  /api/auth/me/language` so WhatsApp alerts and the IVR use the same language.
+- Never hardcode user-facing strings in components that ship to both languages; add a key.
+
+### Offline-first PWA
+- `src/app/manifest.ts` (Metadata Route) + icons in `public/icons/`. Service worker is
+  **hand-written** at `public/sw.js` — no `next-pwa`.
+- `ServiceWorkerRegistrar` (Client) registers `/sw.js` only in production builds
+  (`process.env.NODE_ENV === "production"`) so dev HMR is not cached.
+- SW strategies: static `/_next/static/*` + icons cache-first; `GET {API}/api/jobs/search` and
+  `GET {API}/api/jobs/{slug}` network-first (4 s timeout) with cache fallback; navigations
+  network-first with `/offline` fallback. **Never cache a request with an `Authorization` header**
+  or any non-GET. Bump `CACHE_VERSION` when the strategy changes; delete old caches in `activate`.
+- Offline apply: `src/lib/offlineQueue.ts` (IndexedDB, no dependency) stores `{ jobId, coverNote,
+  queuedAt }`; `ApplyButton` queues when `!navigator.onLine` or the fetch throws a `TypeError`;
+  `OfflineSync` replays on `online` and at start. `409` on replay = success. Show a toast either way.
+- `OfflineBanner` (Client) reflects `navigator.onLine` with `online`/`offline` listeners.
+
+### Voice search + transliteration
+- `useSpeechSearch` wraps `window.SpeechRecognition ?? window.webkitSpeechRecognition` with
+  `lang` = `hi-IN` or `en-IN` from the current locale; feature-detect and **hide the mic button**
+  when unsupported. Type the API locally (`src/types/speech.d.ts`) — no `any`.
+- Hinglish/Devanagari queries are sent as typed; the backend `QueryNormalizer` maps them.
+
+### Trust, fraud, skill gap, consent
+- `TrustBadge` renders `trustLevel` (`BUSINESS_VERIFIED`, `PHONE_VERIFIED`, `UNVERIFIED`) and
+  `employerSince`. Never show a numeric risk score to candidates.
+- `ReportJobButton` (signed-in, any role) → `POST /api/jobs/{id}/report`; `409` = already reported.
+- Employer post form shows the moderation outcome: `PENDING_REVIEW` with `riskReasons` from the
+  create response.
+- `SkillGapPanel` (candidate only) → `GET /api/candidate/jobs/{id}/skill-gap`; links open official
+  portals in a new tab with `rel="noopener noreferrer"`.
+- Candidate dashboard holds consent toggles (`/api/candidate/consents`), data export (download the
+  JSON blob), and account deletion (confirm dialog).
+- `/admin/moderation` is gated in `proxy.ts` like `/candidate` and `/employer`; authorization is
+  still enforced by the API (`ROLE_ADMIN`).
+
+### E2E tests (Playwright)
+- `frontend/e2e/*.spec.ts`, config `frontend/playwright.config.ts`, Chromium only, `baseURL` from
+  `E2E_BASE_URL` (default `http://localhost:3000`), API from `E2E_API_URL`.
+- Tests run against the **real stack** (Compose infra + backend jar + `next start`), never mocks.
+  Create data through the API (OTP stub code `123456`), use unique phone numbers per test, and
+  prefer role/label locators (`getByRole`, `getByLabel`) over CSS.
+- Offline behavior: `context.setOffline(true)` after the SW is active (production build only).
+
 ## Anti-patterns to fix on sight
 
 | Anti-pattern | Fix |
 |---|---|
 | `getServerSideProps` / `pages/` (Pages Router) | App Router server components + `fetch` |
+| Hardcoded English strings in shared UI | dictionary key + `useT()` / `getDictionary()` |
+| `next-pwa` or caching authenticated API responses in the SW | hand-written `public/sw.js`, skip `Authorization` requests |
+| Showing a numeric fraud score to candidates | `TrustBadge` only |
 | Synchronous `params` / `searchParams` / `cookies()` / `headers()` | `await` them — they are Promises in Next.js 16 |
 | `middleware.ts` | `proxy.ts` (export `proxy`, Node.js runtime) |
 | `--turbopack` / `--turbo` flag in scripts | remove it — Turbopack is the default in 16 |
@@ -378,3 +438,6 @@ export default nextConfig;
 - Validate external data with Zod; model varying state with discriminated unions.
 - `output: "standalone"` for the Docker image; minimize client JS for slow networks.
 - Styling/components → naukrinearby-tailwind-shadcn.
+- Differentiators → i18n dictionaries + `nn_lang` cookie, hand-written SW + IndexedDB apply queue,
+  Web Speech voice search, `TrustBadge`/`ReportJobButton`/`SkillGapPanel`, Playwright against the
+  real stack.

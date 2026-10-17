@@ -182,6 +182,29 @@ ResponseEntity<Void> twilioStatus(HttpServletRequest req,
 The webhook path is `permitAll()` in the filter chain (Twilio has no JWT) — the signature check
 **is** its authentication. Keep it idempotent: dedup on `MessageSid`.
 
+The same rule covers **every** Twilio webhook: `/api/webhooks/twilio` (status),
+`/api/webhooks/twilio/inbound` (WhatsApp chat), and the voice/IVR pair
+`/api/webhooks/twilio/voice` + `/api/webhooks/twilio/voice/gather` (ADR 0008). Verify first, then
+act. TwiML replies are built with `util.TwiML`, which escapes every user-derived string with
+`HtmlUtils.htmlEscape(text, "UTF-8")` — never concatenate raw `Body`/`SpeechResult` text into XML.
+IVR state is keyed by `CallSid` in Redis (TTL 15 min); caller numbers are redacted in logs.
+
+### A.5b Roles and the ADMIN bootstrap
+
+Roles: `CANDIDATE`, `EMPLOYER`, `ADMIN`. There is no self-service ADMIN sign-up. A phone listed in
+`naukri.admin.phones` (`NAUKRI_ADMIN_PHONES`, comma-separated, E.164) is assigned `ADMIN` at
+`verify-otp`. `/api/admin/**` is `hasRole("ADMIN")` in the filter chain. Admins moderate jobs
+(ADR 0007) and may call actuator endpoints that need ADMIN on the management port.
+
+### A.5c CSRF
+
+CSRF protection is disabled for the API on purpose: every authenticated request carries the JWT in
+the `Authorization` header, which a cross-site form or image cannot set, and no cookie authenticates
+a request (`nn_session` is only a UI routing hint, read by `proxy.ts`). Twilio webhooks are
+authenticated by signature, not cookies. Keep the explanatory comment next to `csrf(...)` in
+`SecurityConfig`. **If authentication ever moves to cookies (httpOnly access token), CSRF must be
+turned on** (`CookieCsrfTokenRepository` + the SPA handler) for every cookie-authenticated route.
+
 ### A.6 Secrets & configuration
 
 - All credentials (LLM API key, Twilio SID/token, Bhashini key, JWT keys, DB password, object-storage keys)
@@ -223,6 +246,16 @@ Resumes contain names, phones, addresses — personal data under India's DPDP Ac
 - **Right to erasure:** `ON DELETE CASCADE` on `user_id` FKs (already in the schema) plus a job that
   purges the resume file from object storage when a user is deleted.
 - **Least data in tokens:** JWT claims hold `sub`/`role`, not name/email/phone.
+- **Consent ledger (notice and consent):** `consents` rows are append-only
+  (`user_id`, `purpose`, `granted`, `notice_version`, `created_at`); the latest row per purpose is
+  the current state. Purposes: `RESUME_PROCESSING`, `WHATSAPP_ALERTS`. Withdrawing
+  `WHATSAPP_ALERTS` stops alerts (the notification worker checks it). Erasure deletes the ledger
+  with the user.
+- **Right to access:** `GET /api/candidate/account/export` returns the user's personal data
+  (account, profile, applications, saved jobs, notification preferences, consents) as JSON with
+  `Content-Disposition: attachment`. It never includes another user's data or internal risk scores.
+- **LLM tracing:** `LlmTracer` (Langfuse) receives metadata only (provider, model, prompt version,
+  latency, validity, character counts) — never resume text, names, or phones.
 
 ---
 
@@ -269,7 +302,25 @@ NOTIFICATIONS
 DASHBOARD
   GET    /api/candidate/dashboard/stats                               → 200 DashboardStatsDTO
   GET    /api/employer/dashboard/stats                                → 200 DashboardStatsDTO
+
+DIFFERENTIATORS (ADRs 0007–0009)
+  PUT    /api/auth/me/language         { language }                    → 204  (en | hi | ta | te | bn | mr)
+  GET    /api/employer/profile                                        → 200 EmployerProfileResponse (incl. trustLevel)
+  PUT    /api/employer/profile         EmployerProfileRequest          → 200  (GSTIN → GstVerifier)
+  POST   /api/jobs/{id}/report         { reason, details? }             → 201 / 409 (already reported)  (auth)
+  GET    /api/candidate/jobs/{id}/skill-gap                           → 200 SkillGapResponse
+  GET    /api/candidate/consents                                      → 200 List<ConsentResponse>
+  PUT    /api/candidate/consents       { purpose, granted }            → 200
+  GET    /api/candidate/account/export                                → 200 application/json attachment
+  GET    /api/admin/moderation/jobs?status=PENDING_REVIEW             → 200 PageResponse<ModerationItem>
+  POST   /api/admin/moderation/jobs/{id}/decision { decision, note? }  → 200  (APPROVED | REJECTED)
+  POST   /api/webhooks/twilio/voice    (Twilio-signed)                → 200 TwiML / 403
+  POST   /api/webhooks/twilio/voice/gather?step=… (Twilio-signed)     → 200 TwiML / 403
 ```
+
+Visibility rule (ADR 0007): public reads (`/api/jobs/search`, `/api/jobs/{slug}`, recommendations)
+return only `ACTIVE` + `APPROVED` jobs. `JobResponse` carries `trustLevel` and `employerSince` for
+everyone; `moderationStatus` and `riskReasons` are filled only for the owning employer and admins.
 
 ### B.2 Error shape — ProblemDetail (RFC 9457)
 
