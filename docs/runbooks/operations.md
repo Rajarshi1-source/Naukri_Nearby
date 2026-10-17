@@ -54,6 +54,14 @@ Symptoms: `notification_dlq_depth > 0`.
    `POST /_aliases {"actions":[{"remove":{"index":"jobs_v1","alias":"jobs"}},{"add":{"index":"jobs_v2","alias":"jobs"}}]}`
 4. Verify, then `DELETE /jobs_v1`. Search degrades to PostGIS automatically if ES is unavailable mid-flip.
 
+## Bhashini translation
+`TRANSLATION_PROVIDER=bhashini` needs `BHASHINI_USER_ID` and `BHASHINI_ULCA_API_KEY` (ULCA "My Profile")
+and `BHASHINI_PIPELINE_ID` (Pipeline Search call or ULCA); the app refuses to start without them. The
+pipeline config is cached per language pair for an hour and re-fetched after a 401/403. If alerts arrive
+in English or job pages say "translation not available", check the `bhashini` circuit breaker at
+`/actuator/circuitbreakers` (management port) and the logs for `Translation en->xx failed`. Job
+translations are cached in Redis under `jobtr:*` for 7 days; deleting those keys forces a re-translate.
+
 ## Switching to real providers (ADR 0002)
 Set the relevant `*_PROVIDER` env + keys (see `.env.example` / `k8s/config-and-secrets.example.yaml`)
 and restart. Embedding dims must stay 1024 to match the pgvector column. No code change required.

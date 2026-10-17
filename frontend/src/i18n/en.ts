@@ -64,6 +64,10 @@ export const en = {
     salaryHidden: "Salary not disclosed",
     employerSince: "On NaukriNearby since {date}",
     notFound: "Job not found",
+    readIn: "Read this job in",
+    translatedNote: "Machine-translated with Bhashini. It may contain mistakes; the original is above.",
+    translating: "Translating…",
+    translationUnavailable: "Translation is not available right now.",
   },
   apply: {
     apply: "Apply now",

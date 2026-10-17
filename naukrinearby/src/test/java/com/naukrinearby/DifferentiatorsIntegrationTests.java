@@ -215,6 +215,30 @@ class DifferentiatorsIntegrationTests {
 				.jsonPath("$.suggestions[1].portals[0].id").isEqualTo("swayam");
 	}
 
+	@Test
+	void jobTranslation_endpoint_isPublic_validatesLanguage_andHidesPendingJobs() {
+		RestTestClient client = client();
+		String employer = token(client, nextPhone(), "EMPLOYER");
+		Map<String, Object> live = postJson(client, employer, "/api/jobs",
+				jobBody("Tailor", "Stitching and alterations at a boutique."));
+
+		// The test profile uses the passthrough stub, so the original comes back marked untranslated.
+		client.get().uri("/api/jobs/" + live.get("slug") + "/translation?lang=hi")
+				.exchange().expectStatus().isOk()
+				.expectBody()
+				.jsonPath("$.translated").isEqualTo(false)
+				.jsonPath("$.language").isEqualTo("hi")
+				.jsonPath("$.sourceLanguage").isEqualTo("en")
+				.jsonPath("$.title").isEqualTo("Tailor");
+		client.get().uri("/api/jobs/" + live.get("slug") + "/translation?lang=xx")
+				.exchange().expectStatus().isBadRequest();
+
+		Map<String, Object> pending = postJson(client, employer, "/api/jobs",
+				jobBody("Helper", "Pay registration fee Rs 500. Ghar baithe earn daily."));
+		client.get().uri("/api/jobs/" + pending.get("slug") + "/translation?lang=hi")
+				.exchange().expectStatus().isNotFound();
+	}
+
 	// ---------------------------------------------------------------- DPDP consent + export, language
 
 	@Test

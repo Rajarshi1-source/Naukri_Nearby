@@ -6,6 +6,7 @@ import { ShieldAlert } from "lucide-react";
 import ApplyButton from "@/components/ApplyButton";
 import ReportJobButton from "@/components/ReportJobButton";
 import SaveButton from "@/components/SaveButton";
+import JobTranslationPanel from "@/components/JobTranslationPanel";
 import SkillGapPanel from "@/components/SkillGapPanel";
 import TrustBadge from "@/components/TrustBadge";
 import { Badge } from "@/components/ui/badge";
@@ -114,6 +115,7 @@ export default async function JobDetailPage({ params }: Props) {
             </div>
           )}
 
+          <JobTranslationPanel slug={job.slug} />
           <SkillGapPanel jobId={job.id} />
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-5">

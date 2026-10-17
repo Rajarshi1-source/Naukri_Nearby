@@ -3,12 +3,14 @@ package com.naukrinearby.controller;
 import java.util.List;
 
 import com.naukrinearby.model.dto.job.JobResponse;
+import com.naukrinearby.model.dto.job.JobTranslationResponse;
 import com.naukrinearby.model.dto.search.JobMatch;
 import com.naukrinearby.model.dto.search.SearchQuery;
 import com.naukrinearby.model.dto.search.SearchResponse;
 import com.naukrinearby.model.entity.Job;
 import com.naukrinearby.security.AuthPrincipal;
 import com.naukrinearby.service.JobService;
+import com.naukrinearby.service.JobTranslationService;
 import com.naukrinearby.service.MatchingService;
 import com.naukrinearby.service.SearchService;
 
@@ -27,6 +29,7 @@ public class SearchController {
 	private final SearchService searchService;
 	private final JobService jobService;
 	private final MatchingService matchingService;
+	private final JobTranslationService jobTranslationService;
 
 	/** Public hyperlocal job search (Elasticsearch, PostGIS fallback). */
 	@GetMapping("/api/jobs/search")
@@ -63,6 +66,15 @@ public class SearchController {
 		boolean owner = viewerId != null && job.getEmployer() != null
 				&& viewerId.equals(job.getEmployer().getUserId());
 		return admin || owner ? JobResponse.forOwner(job) : JobResponse.from(job);
+	}
+
+	/**
+	 * Public job title and description in another language (Bhashini), cached per job version.
+	 * {@code translated=false} means the original text was returned.
+	 */
+	@GetMapping("/api/jobs/{slug}/translation")
+	public JobTranslationResponse translation(@PathVariable String slug, @RequestParam String lang) {
+		return jobTranslationService.translate(slug, lang);
 	}
 
 	/** Personalized recommendations for the signed-in candidate (pgvector + PostGIS). */

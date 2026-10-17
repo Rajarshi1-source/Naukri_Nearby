@@ -199,6 +199,17 @@ export const ModerationItemSchema = z.object({
 });
 export type ModerationItem = z.infer<typeof ModerationItemSchema>;
 
+export const JobTranslationSchema = z.object({
+  jobId: z.number(),
+  language: z.string(),
+  sourceLanguage: z.string(),
+  title: z.string(),
+  description: z.string().nullable(),
+  translated: z.boolean(),
+  provider: z.string(),
+});
+export type JobTranslation = z.infer<typeof JobTranslationSchema>;
+
 export interface ProblemDetail {
   type?: string;
   title?: string;
