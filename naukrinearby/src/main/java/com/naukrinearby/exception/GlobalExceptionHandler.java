@@ -27,8 +27,8 @@ public class GlobalExceptionHandler {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "No such endpoint");
 	}
 
-	@ExceptionHandler(DuplicateApplicationException.class)
-	ProblemDetail handleDuplicate(DuplicateApplicationException ex) {
+	@ExceptionHandler({ DuplicateApplicationException.class, ConflictException.class })
+	ProblemDetail handleDuplicate(RuntimeException ex) {
 		return ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
 	}
 

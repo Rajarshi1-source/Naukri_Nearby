@@ -52,15 +52,14 @@ public class ApplicationController {
 	@PreAuthorize("hasRole('CANDIDATE')")
 	public PageResponse<ApplicationResponse> myApplications(Pageable pageable,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return PageResponse.from(applicationService.myApplications(principal.id(), pageable), ApplicationResponse::from);
+		return PageResponse.from(applicationService.myApplicationViews(principal.id(), pageable), a -> a);
 	}
 
 	@GetMapping("/api/employer/jobs/{id}/applications")
 	@PreAuthorize("hasRole('EMPLOYER')")
 	public PageResponse<ApplicationResponse> applicants(@PathVariable("id") Long jobId, Pageable pageable,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return PageResponse.from(applicationService.applicantsForJob(jobId, principal.id(), pageable),
-				ApplicationResponse::from);
+		return PageResponse.from(applicationService.applicantViews(jobId, principal.id(), pageable), a -> a);
 	}
 
 	@PatchMapping("/api/applications/{id}/status")

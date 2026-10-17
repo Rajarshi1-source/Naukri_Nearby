@@ -16,6 +16,7 @@ import com.naukrinearby.model.dto.search.SearchResultItem;
 import com.naukrinearby.model.entity.Job;
 import com.naukrinearby.repository.JobRepository;
 import com.naukrinearby.service.search.HybridSearchStrategy;
+import com.naukrinearby.service.search.QueryNormalizer;
 import com.naukrinearby.service.search.SearchRankingStrategy;
 
 import io.micrometer.core.instrument.MeterRegistry;
@@ -44,11 +45,15 @@ public class SearchService {
 	private final StringRedisTemplate redis;
 	private final ObjectMapper objectMapper;
 	private final MeterRegistry meterRegistry;
+	private final QueryNormalizer queryNormalizer;
 
 	public SearchResponse search(SearchQuery query) {
 		Timer.Sample sample = Timer.start(meterRegistry);
 		try {
-			return doSearch(query);
+			// Hinglish/Devanagari → canonical English terms before the cache key and the index see it.
+			SearchQuery normalized = new SearchQuery(queryNormalizer.normalize(query.q()), query.lat(),
+					query.lng(), query.radiusKm(), query.category(), query.size());
+			return doSearch(normalized);
 		}
 		finally {
 			sample.stop(meterRegistry.timer("search_duration_seconds"));
@@ -130,7 +135,7 @@ public class SearchService {
 				.map(j -> new SearchResultItem(
 						j.getId(), j.getTitle(), j.getSlug(),
 						j.getCategory() == null ? null : j.getCategory().name(),
-						j.getCity(), null, j.getSalaryMin(), j.getSalaryMax(), null))
+						j.getCity(), null, j.getSalaryMin(), j.getSalaryMax(), null, null))
 				.toList();
 		return new SearchResponse(items, items.size(), "postgis", true);
 	}
@@ -164,7 +169,8 @@ public class SearchService {
 				str(src.get("company_name")),
 				toInt(src.get("salary_min")),
 				toInt(src.get("salary_max")),
-				distanceKm);
+				distanceKm,
+				str(src.get("trust_level")));
 	}
 
 	private static String str(Object o) {

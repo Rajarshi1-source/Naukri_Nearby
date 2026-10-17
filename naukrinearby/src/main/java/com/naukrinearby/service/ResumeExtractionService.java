@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Set;
 
 import com.naukrinearby.config.EvalProperties;
+import com.naukrinearby.config.LlmProperties;
 import com.naukrinearby.generation.LlmExtractionProvider;
+import com.naukrinearby.generation.LlmTracer;
 import com.naukrinearby.model.dto.ResumeParseResult;
 import com.naukrinearby.util.PromptLoader;
 
@@ -31,6 +33,8 @@ public class ResumeExtractionService {
 	private final LlmExtractionProvider llm;
 	private final PromptLoader promptLoader;
 	private final EvalProperties evalProps;
+	private final LlmProperties llmProps;
+	private final LlmTracer tracer;
 
 	public ResumeParseResult extract(String resumeText) {
 		String prompt = promptLoader.load(PROMPT_VERSION)
@@ -38,15 +42,19 @@ public class ResumeExtractionService {
 
 		long start = System.currentTimeMillis();
 		boolean valid = false;
+		int skills = -1;
 		try {
 			ResumeParseResult result = llm.extractStructured(prompt, ResumeParseResult.class, PROMPT_VERSION);
 			postProcess(result);
 			result.setPromptVersion(PROMPT_VERSION);
 			valid = true;
+			skills = result.getSkills() == null ? 0 : result.getSkills().size();
 			return result;
 		}
 		finally {
 			trace(start, valid);
+			tracer.record(new LlmTracer.LlmTrace("resume-extraction", llm.providerId(), llmProps.extractionModel(),
+					PROMPT_VERSION, System.currentTimeMillis() - start, valid, prompt.length(), skills));
 		}
 	}
 

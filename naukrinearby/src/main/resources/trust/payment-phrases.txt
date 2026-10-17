@@ -1,0 +1,39 @@
+# Phrases that ask a job seeker to pay money. Lower-case; matched as substrings (no regex).
+# English
+registration fee
+registration charge
+registration amount
+security deposit
+refundable deposit
+processing fee
+joining fee
+training fee
+documentation fee
+kit fee
+uniform fee
+interview fee
+pay rs
+pay ₹
+pay inr
+advance payment
+deposit amount
+deposit money
+# Hinglish
+paise jama
+paisa jama
+fees jama
+fee jama
+fees deni
+fees dena
+fee dena
+jama karna hoga
+jama karne honge
+# Devanagari
+पंजीकरण शुल्क
+रजिस्ट्रेशन फीस
+रजिस्ट्रेशन शुल्क
+सिक्योरिटी डिपॉजिट
+जमा राशि
+फीस जमा
+पैसे जमा
+शुल्क जमा

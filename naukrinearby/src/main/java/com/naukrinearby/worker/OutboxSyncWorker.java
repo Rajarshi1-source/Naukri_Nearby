@@ -3,6 +3,7 @@ package com.naukrinearby.worker;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import co.elastic.clients.elasticsearch.ElasticsearchClient;
 import co.elastic.clients.elasticsearch._types.ElasticsearchException;
@@ -10,6 +11,7 @@ import co.elastic.clients.elasticsearch._types.VersionType;
 import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.config.SearchProperties;
 import com.naukrinearby.model.entity.OutboxEvent;
+import com.naukrinearby.model.enums.ModerationStatus;
 import com.naukrinearby.repository.OutboxRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -37,6 +39,7 @@ public class OutboxSyncWorker {
 
 	private static final int BATCH = 100;
 	private static final int MAX_RETRIES = 5;
+	private static final Set<String> ALERT_EVENTS = Set.of("JOB_CREATED", "JOB_APPROVED");
 
 	private final OutboxRepository outboxRepo;
 	private final ElasticsearchClient es;
@@ -53,16 +56,19 @@ public class OutboxSyncWorker {
 		}
 		for (OutboxEvent event : batch) {
 			try {
-				indexToElasticsearch(event);
+				boolean indexed = syncToElasticsearch(event);
 				event.setStatus("PROCESSED");
 				event.setProcessedAt(Instant.now());
-				if ("JOB_CREATED".equals(event.getEventType())) {
+				// Alerts go out when a job first becomes searchable: on create, or on admin approval of
+				// a job that was held for review (ADR 0007).
+				if (indexed && ALERT_EVENTS.contains(event.getEventType())) {
 					events.publishEvent(new JobIndexedEvent(event.getAggregateId(), event.getEventType()));
 				}
 			}
 			catch (ElasticsearchException ex) {
-				// Version conflict means a newer document is already indexed — treat as success.
-				if (ex.status() == 409) {
+				// 409: a newer version is already indexed. 404: deleting a document that was never
+				// indexed (e.g. a job held for review). Both mean the index already reflects this event.
+				if (ex.status() == 409 || ex.status() == 404) {
 					event.setStatus("PROCESSED");
 					event.setProcessedAt(Instant.now());
 					log.debug("Outbox event {} superseded by newer version", event.getId());
@@ -90,18 +96,28 @@ public class OutboxSyncWorker {
 		}
 	}
 
+	/**
+	 * Applies one event to the index. Closed jobs and jobs that are not {@code APPROVED} are deleted
+	 * (version-guarded, so a stale delete cannot remove a newer approved document); everything else is
+	 * an idempotent, version-guarded upsert on {@code job_id}.
+	 *
+	 * @return true if the job is now indexed (searchable)
+	 */
 	@SuppressWarnings("unchecked")
-	private void indexToElasticsearch(OutboxEvent event) throws Exception {
+	private boolean syncToElasticsearch(OutboxEvent event) throws Exception {
 		String jobId = String.valueOf(event.getAggregateId());
 		String index = searchProps.index();
-
-		if ("JOB_CLOSED".equals(event.getEventType())) {
-			es.delete(d -> d.index(index).id(jobId));
-			return;
-		}
+		long version = event.getVersion() == null ? 1L : event.getVersion();
 
 		Map<String, Object> doc = objectMapper.readValue(event.getPayload(), Map.class);
-		long version = event.getVersion() == null ? 1L : event.getVersion();
+		Object moderation = doc.get("moderation_status");
+		boolean hidden = "JOB_CLOSED".equals(event.getEventType())
+				|| (moderation != null && !ModerationStatus.APPROVED.name().equals(moderation));
+		if (hidden) {
+			es.delete(d -> d.index(index).id(jobId).versionType(VersionType.External).version(version));
+			return false;
+		}
+
 		// External version guard: ES rejects (409) any event older than the indexed document.
 		es.index(i -> i
 				.index(index)
@@ -109,6 +125,7 @@ public class OutboxSyncWorker {
 				.versionType(VersionType.External)
 				.version(version)
 				.document(doc));
+		return true;
 	}
 
 	/** Nightly reconciliation safety net (starter §1.6): re-enqueue / alert on drift. */

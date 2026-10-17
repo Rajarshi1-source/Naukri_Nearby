@@ -11,14 +11,23 @@ import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { authService } from "@/services/authService";
 import { cn } from "@/lib/utils";
+import { fmt } from "@/i18n";
+import { useT } from "@/i18n/I18nProvider";
 
 type Step = "phone" | "otp";
+
+const HOME_BY_ROLE: Record<string, string> = {
+  CANDIDATE: "/jobs",
+  EMPLOYER: "/employer",
+  ADMIN: "/admin/moderation",
+};
 type Role = "CANDIDATE" | "EMPLOYER";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const { login } = useAuth();
+  const t = useT();
 
   const [step, setStep] = useState<Step>("phone");
   const [phone, setPhone] = useState("");
@@ -27,7 +36,9 @@ function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  const redirectTo = params.get("next") || "/jobs";
+  // Only same-site paths: "/x" but never "//host" or "https://…" (open-redirect guard).
+  const next = params.get("next");
+  const safeNext = next && next.startsWith("/") && !next.startsWith("//") && !next.startsWith("/\\") ? next : null;
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault();
@@ -37,7 +48,7 @@ function LoginForm() {
       await authService.sendOtp(phone);
       setStep("otp");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not send OTP");
+      setError(err instanceof ApiError ? err.message : t.login.sendFailed);
     } finally {
       setBusy(false);
     }
@@ -50,9 +61,9 @@ function LoginForm() {
     try {
       const auth = await authService.verifyOtp(phone, code, role);
       await login(auth);
-      router.push(redirectTo);
+      router.push(safeNext ?? HOME_BY_ROLE[auth.role] ?? "/jobs");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Invalid code");
+      setError(err instanceof ApiError ? err.message : t.login.invalid);
     } finally {
       setBusy(false);
     }
@@ -62,12 +73,10 @@ function LoginForm() {
     <Card className="mx-auto mt-10 max-w-md">
       <CardHeader>
         <CardTitle className="text-2xl">
-          {step === "phone" ? "Login or register" : "Enter the code"}
+          {step === "phone" ? t.login.titlePhone : t.login.titleOtp}
         </CardTitle>
         <CardDescription>
-          {step === "phone"
-            ? "We'll send a one-time password to your phone."
-            : `Sent to ${phone}. (Dev: use 123456)`}
+          {step === "phone" ? t.login.descPhone : fmt(t.login.descOtp, { phone })}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -80,7 +89,7 @@ function LoginForm() {
         {step === "phone" ? (
           <form onSubmit={sendOtp} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="phone">Phone number</Label>
+              <Label htmlFor="phone">{t.login.phone}</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -92,13 +101,13 @@ function LoginForm() {
             </div>
             <RoleToggle role={role} setRole={setRole} />
             <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Sending…" : "Send OTP"}
+              {busy ? t.login.sending : t.login.send}
             </Button>
           </form>
         ) : (
           <form onSubmit={verifyOtp} className="space-y-4">
             <div className="space-y-1.5">
-              <Label htmlFor="code">One-time password</Label>
+              <Label htmlFor="code">{t.login.otp}</Label>
               <Input
                 id="code"
                 inputMode="numeric"
@@ -110,7 +119,7 @@ function LoginForm() {
               />
             </div>
             <Button type="submit" disabled={busy} className="w-full">
-              {busy ? "Verifying…" : "Verify & continue"}
+              {busy ? t.login.verifying : t.login.verify}
             </Button>
             <Button
               type="button"
@@ -118,7 +127,7 @@ function LoginForm() {
               className="w-full"
               onClick={() => setStep("phone")}
             >
-              Change phone number
+              {t.login.changePhone}
             </Button>
           </form>
         )}
@@ -134,21 +143,23 @@ function RoleToggle({
   role: Role;
   setRole: (r: Role) => void;
 }) {
+  const t = useT();
   return (
     <div className="space-y-1.5">
-      <Label>I am a</Label>
+      <Label>{t.login.iAm}</Label>
       <div className="grid grid-cols-2 gap-2">
         {(["CANDIDATE", "EMPLOYER"] as Role[]).map((r) => (
           <Button
             key={r}
             type="button"
             variant="outline"
+            aria-pressed={role === r}
             onClick={() => setRole(r)}
             className={cn(
               role === r && "border-brand bg-brand-light text-brand-dark",
             )}
           >
-            {r === "CANDIDATE" ? "Job seeker" : "Employer"}
+            {r === "CANDIDATE" ? t.login.jobSeeker : t.login.employer}
           </Button>
         ))}
       </div>

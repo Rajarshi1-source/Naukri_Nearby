@@ -9,6 +9,7 @@ import java.util.Map;
 import com.naukrinearby.config.NotificationProperties;
 import com.naukrinearby.generation.WhatsAppSender;
 import com.naukrinearby.model.entity.Job;
+import com.naukrinearby.model.enums.ConsentPurpose;
 import com.naukrinearby.model.entity.NotificationLog;
 import com.naukrinearby.repository.CandidateProfileRepository;
 import com.naukrinearby.repository.JobRepository;
@@ -48,6 +49,7 @@ public class NotificationService {
 	private final RedisRateLimiter rateLimiter;
 	private final NotificationProperties props;
 	private final MeterRegistry meterRegistry;
+	private final ConsentService consentService;
 
 	/** Reacts to a newly-indexed job: find nearby, skill-matched candidates and enqueue alerts. */
 	@Async
@@ -102,6 +104,10 @@ public class NotificationService {
 		String lang = fields.getOrDefault("lang", "en");
 
 		if (notificationLogRepo.existsByCandidateIdAndJobId(userId, jobId)) {
+			return true;
+		}
+		// DPDP: a candidate who withdrew WhatsApp-alert consent is never messaged (safely skipped).
+		if (consentService.isWithdrawn(userId, ConsentPurpose.WHATSAPP_ALERTS)) {
 			return true;
 		}
 		// SETNX claim: only the first consumer for this (user,job) proceeds.

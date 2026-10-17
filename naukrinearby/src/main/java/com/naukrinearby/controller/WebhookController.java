@@ -4,6 +4,7 @@ import java.util.Map;
 
 import com.naukrinearby.service.WhatsAppConversationService;
 import com.naukrinearby.service.WhatsAppWebhookService;
+import com.naukrinearby.util.TwiML;
 
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
@@ -48,19 +49,7 @@ public class WebhookController {
 		}
 		String reply = conversationService.handleInbound(params.get("From"), params.get("Body"));
 		return ResponseEntity.ok()
-				.contentType(MediaType.APPLICATION_XML)
-				.body(twiml(reply));
-	}
-
-	private static String twiml(String message) {
-		return "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>"
-				+ xmlEscape(message) + "</Message></Response>";
-	}
-
-	private static String xmlEscape(String s) {
-		if (s == null) {
-			return "";
-		}
-		return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
+				.contentType(TwiML.CONTENT_TYPE)
+				.body(TwiML.response().message(reply).build());
 	}
 }

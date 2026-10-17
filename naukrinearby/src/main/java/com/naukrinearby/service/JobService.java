@@ -2,20 +2,19 @@ package com.naukrinearby.service;
 
 import java.util.List;
 
-import tools.jackson.databind.ObjectMapper;
 import com.naukrinearby.exception.ForbiddenException;
 import com.naukrinearby.exception.NotFoundException;
 import com.naukrinearby.exception.ValidationException;
 import com.naukrinearby.model.dto.job.JobCreateRequest;
 import com.naukrinearby.model.dto.job.JobUpdateRequest;
-import com.naukrinearby.model.elasticsearch.JobDocument;
 import com.naukrinearby.model.entity.Employer;
 import com.naukrinearby.model.entity.Job;
-import com.naukrinearby.model.entity.OutboxEvent;
 import com.naukrinearby.model.enums.JobStatus;
+import com.naukrinearby.model.enums.ModerationStatus;
 import com.naukrinearby.repository.EmployerRepository;
 import com.naukrinearby.repository.JobRepository;
-import com.naukrinearby.repository.OutboxRepository;
+import com.naukrinearby.service.trust.JobRiskScorer;
+import com.naukrinearby.service.trust.RiskAssessment;
 import com.naukrinearby.util.SlugGenerator;
 
 import lombok.RequiredArgsConstructor;
@@ -28,17 +27,21 @@ import org.springframework.transaction.annotation.Transactional;
  * Job write-side. The job row AND its outbox event commit atomically — Elasticsearch is NOT touched
  * here; {@code OutboxSyncWorker} drains the outbox into ES (master plan §9.2, starter §1.2). The
  * domain {@code version} column is bumped on every change so the sync never indexes a stale update.
+ *
+ * <p>Every create/update is scored by {@link JobRiskScorer} (ADR 0007). A risky posting is stored
+ * with {@code PENDING_REVIEW}; the moderation status rides the outbox payload and the sync worker
+ * keeps such jobs out of the search index until an admin approves them.
  */
 @Service
 @RequiredArgsConstructor
 public class JobService {
 
 	private final JobRepository jobRepo;
-	private final OutboxRepository outboxRepo;
+	private final JobOutboxWriter outboxWriter;
 	private final EmployerRepository employerRepo;
 	private final EmbeddingService embeddingService;
 	private final GeocodingService geocodingService;
-	private final ObjectMapper objectMapper;
+	private final JobRiskScorer riskScorer;
 
 	@Transactional
 	public Job createJob(JobCreateRequest req, Long userId) {
@@ -68,10 +71,11 @@ public class JobService {
 		job.setRadiusKm(geocodingService.clampRadiusKm(req.radiusKm()));
 		job.setStatus(JobStatus.ACTIVE);
 		job.setVersion(1);
+		applyRiskAssessment(job, employer);
 
 		job = jobRepo.save(job);
 		writeRequirementVector(job);
-		outboxRepo.save(outboxEvent(job, "JOB_CREATED"));
+		outboxWriter.write(job, "JOB_CREATED");
 		return job;
 	}
 
@@ -105,10 +109,11 @@ public class JobService {
 		if (req.radiusKm() != null) {
 			job.setRadiusKm(geocodingService.clampRadiusKm(req.radiusKm()));
 		}
+		applyRiskAssessment(job, job.getEmployer());
 		job.setVersion(job.getVersion() + 1);
 		job = jobRepo.save(job);
 		writeRequirementVector(job);
-		outboxRepo.save(outboxEvent(job, "JOB_UPDATED"));
+		outboxWriter.write(job, "JOB_UPDATED");
 		return job;
 	}
 
@@ -118,14 +123,31 @@ public class JobService {
 		job.setStatus(status);
 		job.setVersion(job.getVersion() + 1);
 		job = jobRepo.save(job);
-		outboxRepo.save(outboxEvent(job, status == JobStatus.CLOSED ? "JOB_CLOSED" : "JOB_UPDATED"));
+		outboxWriter.write(job, status == JobStatus.CLOSED ? "JOB_CLOSED" : "JOB_UPDATED");
 		return job;
 	}
 
+	/**
+	 * Job detail by slug. Jobs that are not approved are visible only to their employer and admins;
+	 * everyone else gets a 404, so a pending or rejected posting cannot be reached by URL.
+	 */
 	@Transactional(readOnly = true)
-	public Job getBySlug(String slug) {
-		return jobRepo.findBySlug(slug)
+	public Job getForViewer(String slug, Long viewerUserId, boolean viewerIsAdmin) {
+		Job job = jobRepo.findBySlug(slug)
 				.orElseThrow(() -> new NotFoundException("Job not found: " + slug));
+		if (job.getModerationStatus() != ModerationStatus.APPROVED
+				&& !viewerIsAdmin && !isOwner(job, viewerUserId)) {
+			throw new NotFoundException("Job not found: " + slug);
+		}
+		return job;
+	}
+
+	/** A job that is open and approved — what candidates may apply to over any channel. */
+	@Transactional(readOnly = true)
+	public Job getPublicJob(Long jobId) {
+		return jobRepo.findById(jobId)
+				.filter(Job::isPubliclyVisible)
+				.orElseThrow(() -> new NotFoundException("Job not found: " + jobId));
 	}
 
 	@Transactional(readOnly = true)
@@ -135,10 +157,25 @@ public class JobService {
 		return jobRepo.findByEmployer_IdOrderByCreatedAtDesc(employer.getId(), pageable);
 	}
 
+	private void applyRiskAssessment(Job job, Employer employer) {
+		RiskAssessment risk = riskScorer.assess(job, employer);
+		job.setRiskScore(risk.score());
+		job.setRiskReasons(risk.reasonCodes());
+		// An admin rejection sticks; anything else is re-decided from the current content.
+		if (job.getModerationStatus() != ModerationStatus.REJECTED) {
+			job.setModerationStatus(riskScorer.needsReview(risk)
+					? ModerationStatus.PENDING_REVIEW : ModerationStatus.APPROVED);
+		}
+	}
+
+	private static boolean isOwner(Job job, Long userId) {
+		return userId != null && job.getEmployer() != null && userId.equals(job.getEmployer().getUserId());
+	}
+
 	private Job loadOwned(Long jobId, Long userId) {
 		Job job = jobRepo.findById(jobId)
 				.orElseThrow(() -> new NotFoundException("Job not found: " + jobId));
-		if (job.getEmployer() == null || !job.getEmployer().getUserId().equals(userId)) {
+		if (!isOwner(job, userId)) {
 			throw new ForbiddenException("You do not own this job");
 		}
 		return job;
@@ -154,26 +191,6 @@ public class JobService {
 	private static String embeddingText(Job job) {
 		String skills = job.getSkillsRequired() == null ? "" : String.join(", ", job.getSkillsRequired());
 		return (job.getTitle() == null ? "" : job.getTitle()) + ". " + skills;
-	}
-
-	private OutboxEvent outboxEvent(Job job, String eventType) {
-		return OutboxEvent.builder()
-				.aggregateType("job")
-				.aggregateId(job.getId())
-				.eventType(eventType)
-				.version(job.getVersion())
-				.payload(toJobDocumentJson(job))
-				.status("PENDING")
-				.build();
-	}
-
-	private String toJobDocumentJson(Job job) {
-		try {
-			return objectMapper.writeValueAsString(JobDocument.from(job));
-		}
-		catch (Exception ex) {
-			throw new IllegalStateException("Failed to serialize job document", ex);
-		}
 	}
 
 	private static String[] toArray(List<String> values) {

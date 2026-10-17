@@ -1,12 +1,17 @@
+"use client";
+
 import Link from "next/link";
 
+import SaveButton from "@/components/SaveButton";
+import TrustBadge from "@/components/TrustBadge";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import SaveButton from "@/components/SaveButton";
+import { useT } from "@/i18n/I18nProvider";
 import { formatDistance, formatSalary, titleCase } from "@/lib/format";
 import type { SearchResultItem } from "@/types";
 
 export default function JobCard({ item }: { item: SearchResultItem }) {
+  const t = useT();
   const distance = formatDistance(item.distanceKm);
   return (
     <Card className="gap-0 py-0 transition hover:shadow-md">
@@ -20,7 +25,7 @@ export default function JobCard({ item }: { item: SearchResultItem }) {
               {item.title}
             </Link>
             <p className="text-sm text-muted-foreground">
-              {item.companyName || "Local employer"}
+              {item.companyName || t.job.localEmployer}
               {item.city ? ` · ${item.city}` : ""}
             </p>
           </div>
@@ -32,8 +37,11 @@ export default function JobCard({ item }: { item: SearchResultItem }) {
               {titleCase(item.category)}
             </Badge>
           )}
+          <TrustBadge level={item.trustLevel} />
           <span className="text-foreground/80">
-            {formatSalary(item.salaryMin, item.salaryMax)}
+            {item.salaryMin || item.salaryMax
+              ? formatSalary(item.salaryMin, item.salaryMax)
+              : t.job.salaryHidden}
           </span>
           {distance && (
             <span className="text-muted-foreground">· {distance}</span>

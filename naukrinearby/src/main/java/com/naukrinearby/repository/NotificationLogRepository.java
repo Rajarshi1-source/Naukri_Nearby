@@ -1,5 +1,6 @@
 package com.naukrinearby.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import com.naukrinearby.model.entity.NotificationLog;
@@ -11,4 +12,6 @@ public interface NotificationLogRepository extends JpaRepository<NotificationLog
 	boolean existsByCandidateIdAndJobId(Long candidateId, Long jobId);
 
 	Optional<NotificationLog> findByMessageSid(String messageSid);
+
+	List<NotificationLog> findByCandidateIdOrderBySentAtDesc(Long candidateId);
 }

@@ -1,6 +1,7 @@
 package com.naukrinearby.controller;
 
 import com.naukrinearby.model.dto.auth.AuthResponse;
+import com.naukrinearby.model.dto.auth.LanguageRequest;
 import com.naukrinearby.model.dto.auth.MeResponse;
 import com.naukrinearby.model.dto.auth.RefreshRequest;
 import com.naukrinearby.model.dto.auth.SendOtpRequest;
@@ -14,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -44,6 +46,14 @@ public class AuthController {
 	@GetMapping("/me")
 	public MeResponse me(@AuthenticationPrincipal AuthPrincipal principal) {
 		return MeResponse.from(authService.requireUser(principal.id()));
+	}
+
+	/** UI language choice; also drives the language of WhatsApp alerts and the IVR (ADR 0009). */
+	@PutMapping("/me/language")
+	public ResponseEntity<Void> language(@Valid @RequestBody LanguageRequest req,
+			@AuthenticationPrincipal AuthPrincipal principal) {
+		authService.updateLanguage(principal.id(), req.language());
+		return ResponseEntity.noContent().build();
 	}
 
 	@PostMapping("/logout")

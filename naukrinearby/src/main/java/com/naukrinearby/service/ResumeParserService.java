@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.naukrinearby.exception.ResumeParseException;
 import com.naukrinearby.generation.VisionProvider;
 import com.naukrinearby.model.dto.ResumeParseResult;
+import com.naukrinearby.model.enums.ConsentPurpose;
 
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -16,6 +17,7 @@ import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.resilience.annotation.ConcurrencyLimit;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -41,9 +43,12 @@ public class ResumeParserService {
 	private final VisionProvider visionProvider;
 	private final StringRedisTemplate redis;
 	private final MeterRegistry meterRegistry;
+	private final ConsentService consentService;
 
 	/** Stores the resume and registers a PENDING parse job. Returns the resumeId for polling. */
 	public String store(Long userId, MultipartFile file) {
+		// Uploading after the on-page privacy notice is the candidate's consent to have it processed.
+		consentService.grantIfAbsent(userId, ConsentPurpose.RESUME_PROCESSING, ConsentService.UPLOAD_NOTICE_VERSION);
 		byte[] content = readBytes(file);
 		String fileKey = storage.upload(content, file.getOriginalFilename(), file.getContentType());
 		String resumeId = UUID.randomUUID().toString();
@@ -58,7 +63,13 @@ public class ResumeParserService {
 		return s == null ? "UNKNOWN" : s;
 	}
 
+	/**
+	 * Runs off the request thread. {@code @ConcurrencyLimit} is the bulkhead (plan D12): at most
+	 * {@code naukri.resume.parse-concurrency} parses run at once and the rest wait their turn, so an
+	 * upload burst cannot exhaust LLM quota, memory, or the DB pool needed by search and WhatsApp.
+	 */
 	@Async
+	@ConcurrencyLimit(limitString = "${naukri.resume.parse-concurrency:4}")
 	public void parseAsync(String resumeId) {
 		setStatus(resumeId, "PROCESSING");
 		Timer.Sample sample = Timer.start(meterRegistry);

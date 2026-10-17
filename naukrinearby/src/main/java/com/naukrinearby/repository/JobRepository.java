@@ -5,6 +5,7 @@ import java.util.Optional;
 
 import com.naukrinearby.model.entity.Job;
 import com.naukrinearby.model.enums.JobStatus;
+import com.naukrinearby.model.enums.ModerationStatus;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -26,10 +27,19 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 
 	long countByEmployer_IdAndStatus(Long employerId, JobStatus status);
 
+	/** All of an employer's jobs, for re-emitting outbox events when employer trust data changes. */
+	List<Job> findByEmployer_Id(Long employerId);
+
+	/** Admin moderation queue (ADR 0007), oldest first. */
+	@EntityGraph(attributePaths = "employer")
+	Page<Job> findByModerationStatusOrderByCreatedAtAsc(ModerationStatus status, Pageable pageable);
+
+	long countByModerationStatus(ModerationStatus status);
+
 	/** PostGIS hyperlocal search — also the Elasticsearch-down fallback (master plan §9.6). */
 	@Query(value = """
 			SELECT j.* FROM jobs j
-			WHERE j.status = 'ACTIVE'
+			WHERE j.status = 'ACTIVE' AND j.moderation_status = 'APPROVED'
 			  AND j.location IS NOT NULL
 			  AND ST_DWithin(j.location, ST_MakePoint(:lng, :lat)::geography, :radiusM)
 			ORDER BY ST_Distance(j.location, ST_MakePoint(:lng, :lat)::geography) ASC
@@ -48,7 +58,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 			SELECT j.id, 1 - (cp.skill_embedding <=> j.requirement_vector) AS similarity,
 			       ST_Distance(j.location, cp.location) / 1000 AS distance_km
 			FROM jobs j, candidate_profiles cp
-			WHERE cp.user_id = :userId AND j.status = 'ACTIVE'
+			WHERE cp.user_id = :userId AND j.status = 'ACTIVE' AND j.moderation_status = 'APPROVED'
 			  AND j.requirement_vector IS NOT NULL AND cp.skill_embedding IS NOT NULL
 			  AND j.location IS NOT NULL AND cp.location IS NOT NULL
 			  AND ST_DWithin(j.location, cp.location, cp.preferred_radius_km * 1000)
@@ -60,7 +70,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	/** Active jobs ranked by pgvector cosine distance to a query vector (hybrid search BM25+vector leg). */
 	@Query(value = """
 			SELECT j.id FROM jobs j
-			WHERE j.status = 'ACTIVE' AND j.requirement_vector IS NOT NULL
+			WHERE j.status = 'ACTIVE' AND j.moderation_status = 'APPROVED' AND j.requirement_vector IS NOT NULL
 			ORDER BY j.requirement_vector <=> CAST(:vec AS vector) ASC
 			LIMIT :limit
 			""", nativeQuery = true)
@@ -69,7 +79,7 @@ public interface JobRepository extends JpaRepository<Job, Long> {
 	/** Same as {@link #findIdsBySimilarity} but constrained to a geo radius (hyperlocal hybrid search). */
 	@Query(value = """
 			SELECT j.id FROM jobs j
-			WHERE j.status = 'ACTIVE' AND j.requirement_vector IS NOT NULL
+			WHERE j.status = 'ACTIVE' AND j.moderation_status = 'APPROVED' AND j.requirement_vector IS NOT NULL
 			  AND j.location IS NOT NULL
 			  AND ST_DWithin(j.location, ST_MakePoint(:lng, :lat)::geography, :radiusM)
 			ORDER BY j.requirement_vector <=> CAST(:vec AS vector) ASC

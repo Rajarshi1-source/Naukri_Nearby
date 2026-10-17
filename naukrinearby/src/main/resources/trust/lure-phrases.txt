@@ -1,0 +1,17 @@
+# Get-rich-quick wording common in scam postings. Lower-case; matched as substrings.
+earn daily
+earn per day
+earn lakhs
+guaranteed income
+guaranteed salary
+work from home and earn
+unlimited earning
+no interview
+direct joining without interview
+ghar baithe
+ghar se kamaye
+roz kamaye
+घर बैठे
+रोज़ कमाएं
+रोज कमाएं
+बिना इंटरव्यू

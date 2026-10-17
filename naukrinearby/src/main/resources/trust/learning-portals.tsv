@@ -1,0 +1,7 @@
+# Official learning portals for skill-gap suggestions (plan D10). Never invent course URLs.
+# id	name	url	keywords (comma-separated, lower-case; * = suggest for any skill)
+skillindia	Skill India Digital Hub	https://www.skillindiadigital.gov.in	*
+swayam	SWAYAM	https://swayam.gov.in	tally,accounting,accounts,excel,computer,data entry,typing,english,communication,gst,bookkeeping,teaching,marketing,sales
+nptel	NPTEL	https://nptel.ac.in	electrical,electrician,electronics,computer,programming,welding,mechanical,civil,construction
+ncs	National Career Service	https://www.ncs.gov.in	*
+sarathi	Parivahan Sarathi (driving licence)	https://sarathi.parivahan.gov.in	driving,driver,two wheeler,four wheeler,commercial driving

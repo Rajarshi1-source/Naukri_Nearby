@@ -152,7 +152,8 @@ naukri:
     stream: notification-jobs
     dlq-stream: notification-dlq
     consumer-group: notifiers
-    consumer-name: worker-1
+    # Pod name in Kubernetes, so each worker replica is a distinct Redis Streams consumer.
+    consumer-name: ${HOSTNAME:worker-1}
   geo:
     min-lat: 6.5
     max-lat: 37.5
@@ -161,6 +162,25 @@ naukri:
     max-radius-km: 100
     geocoder: ${GEOCODER:none}
     geocoder-base-url: ${GEOCODER_BASE_URL:https://nominatim.openstreetmap.org}
+  # Fraud scoring + moderation (ADR 0007).
+  trust:
+    review-threshold: ${TRUST_REVIEW_THRESHOLD:50}
+    report-threshold: ${TRUST_REPORT_THRESHOLD:3}
+    gst-verifier: ${GST_VERIFIER:checksum}
+    new-employer-days: 7
+  # Phones (comma-separated) that receive ROLE_ADMIN at OTP verify. Empty = no admins.
+  admin:
+    phones: ${NAUKRI_ADMIN_PHONES:}
+  # Bulkhead for resume parsing (Framework 7 @ConcurrencyLimit, plan D12).
+  resume:
+    parse-concurrency: ${RESUME_PARSE_CONCURRENCY:4}
+  # LLM observability (plan D13): none | log | langfuse. Metadata only, never resume text.
+  llm-trace:
+    provider: ${LLM_TRACER:none}
+    host: ${LANGFUSE_HOST:}
+    public-key: ${LANGFUSE_PUBLIC_KEY:}
+    secret-key: ${LANGFUSE_SECRET_KEY:}
+    timeout: 5s
   eval:
     enabled: ${EVAL_ENABLED:false}
     api-key: ${EVAL_API_KEY:}

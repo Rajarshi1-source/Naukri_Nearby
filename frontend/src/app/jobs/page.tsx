@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 
+import { getServerDictionary } from "@/i18n/server";
 import SearchClient from "./SearchClient";
 
-export const metadata: Metadata = {
-  title: "Find jobs near you",
-  description:
-    "Search hyperlocal jobs by title, skill, category and distance on a live map.",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getServerDictionary();
+  return { title: t.search.title, description: t.search.subtitle };
+}
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
@@ -26,9 +26,12 @@ export default async function JobsPage({
   const initialRadius =
     Number.isFinite(radiusRaw) && radiusRaw > 0 ? radiusRaw : 10;
 
+  const { t } = await getServerDictionary();
+
   return (
     <div>
-      <h1 className="text-2xl font-bold text-foreground">Jobs near you</h1>
+      <h1 className="text-2xl font-bold text-foreground">{t.search.title}</h1>
+      <p className="mt-1 text-sm text-muted-foreground">{t.search.subtitle}</p>
       <SearchClient
         initialQuery={initialQuery}
         initialCategory={initialCategory}
