@@ -20,21 +20,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { fmt, LOCALE_LABELS } from "@/i18n";
+import { CONTENT_LANGUAGES, fmt } from "@/i18n";
 import { useI18n } from "@/i18n/I18nProvider";
 import { ApiError } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { formatDistance, formatSalary, titleCase } from "@/lib/format";
 import { candidateService } from "@/services/candidateService";
 import type { Consent } from "@/types";
-
-const ALERT_LANGUAGES: Record<string, string> = {
-  ...LOCALE_LABELS,
-  ta: "தமிழ்",
-  te: "తెలుగు",
-  bn: "বাংলা",
-  mr: "मराठी",
-};
 
 export default function CandidateDashboard() {
   const { isAuthenticated, role, loading, logout } = useAuth();
@@ -241,7 +233,7 @@ function AlertSettings() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(ALERT_LANGUAGES).map(([code, label]) => (
+                {Object.entries(CONTENT_LANGUAGES).map(([code, label]) => (
                   <SelectItem key={code} value={code} lang={code}>
                     {label}
                   </SelectItem>

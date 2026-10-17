@@ -33,6 +33,15 @@ test("candidate logs in with OTP, sees trust signals, applies, and finds it on t
   await expect(page.getByText("Your skills for this job")).toBeVisible();
   await expect(page.getByRole("link", { name: /SWAYAM/ }).first()).toHaveAttribute("href", "https://swayam.gov.in");
 
+  // "Read this job in": the request goes to our API (never to Bhashini from the browser). CI and local
+  // runs use the passthrough stub, so the panel must say no translation is available rather than
+  // present English as one.
+  const translation = page.waitForResponse((r) => r.url().includes(`/api/jobs/${job.slug}/translation?lang=ta`));
+  await page.getByRole("combobox", { name: "Read this job in" }).click();
+  await page.getByRole("option", { name: "தமிழ்" }).click();
+  expect((await translation).status()).toBe(200);
+  await expect(page.getByText("Translation is not available right now.")).toBeVisible();
+
   await page.getByRole("button", { name: "Apply now" }).click();
   await expect(page.getByText("Application submitted!").first()).toBeVisible();
 

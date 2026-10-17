@@ -15,6 +15,21 @@ export const LOCALE_LABELS: Record<Locale, string> = {
   hi: "हिंदी",
 };
 
+/**
+ * Content languages: what job alerts and job translations (Bhashini) support, each named in its own
+ * script. Wider than the UI LOCALES, which need a full dictionary.
+ */
+export const CONTENT_LANGUAGES: Record<string, string> = {
+  en: "English",
+  hi: "हिंदी",
+  ta: "தமிழ்",
+  te: "తెలుగు",
+  bn: "বাংলা",
+  mr: "मराठी",
+  kn: "ಕನ್ನಡ",
+  gu: "ગુજરાતી",
+};
+
 /** BCP-47 tags for the Web Speech API and number/date formatting. */
 export const SPEECH_LANG: Record<Locale, string> = {
   en: "en-IN",

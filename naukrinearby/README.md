@@ -47,6 +47,7 @@ model. Set `EXTRACTION_PROVIDER=gpt5mini` + `LLM_API_KEY` for real resume extrac
 - Voice apply (Twilio Voice, signature-verified): `POST /api/webhooks/twilio/voice`,
   `POST /api/webhooks/twilio/voice/gather/{menu|job|confirm}`
 - WhatsApp-first apply: `POST /api/webhooks/twilio/inbound`
+- Job translation (Bhashini, cached per job version): `GET /api/jobs/{slug}/translation?lang=hi`
 
 The full contract is in `../.claude/skills/security-and-api.md` (Part B).
 

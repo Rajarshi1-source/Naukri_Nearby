@@ -21,6 +21,17 @@ English-only and failed hard when offline.
   terms before querying ES or PostGIS. Voice search uses the browser Web Speech API with `hi-IN`
   or `en-IN` and is hidden where unsupported.
 
+### Job translation (Bhashini)
+- `GET /api/jobs/{slug}/translation?lang=` returns the title and description machine-translated by
+  Bhashini's ULCA pipeline API (config call, then compute call; keys stay on the server). Results are
+  cached in Redis per job version, so an edit invalidates them and a popular job costs one provider call
+  per language. Failures return the original with `translated=false` and are not cached.
+- The job page offers "Read this job in …" (all eight content languages) and defaults to the UI
+  language. A translation is always labelled as machine-translated and the original stays visible.
+- UI chrome stays in reviewed dictionaries, not runtime machine translation: labels are short,
+  high-traffic and safety-relevant ("Never pay money to get a job"), so they are translated once and
+  reviewed. Bhashini can draft new dictionaries offline.
+
 ### Offline-first PWA
 - `app/manifest.ts` (installable, standalone) and a **hand-written service worker** at
   `public/sw.js` (no `next-pwa`, which lags Next.js majors).

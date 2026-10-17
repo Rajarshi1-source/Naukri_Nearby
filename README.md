@@ -38,6 +38,7 @@ Screenshots are captured from the running stack with `frontend/scripts/screensho
 
 - **Voice-first apply (IVR).** Call the number, press 1, key in the job number, confirm. Prompts in Hindi and English, keypad or speech, same idempotent apply path as the web ([ADR 0008](docs/adr/0008-voice-ivr-apply.md)).
 - **WhatsApp-first apply.** Build a profile and apply by chatting, no app or resume needed.
+- **Job descriptions in eight Indian languages.** "Read this job in …" on every job page, machine-translated by Bhashini's pipeline API on the server and cached per job version; always labelled, with the original kept visible.
 - **Vernacular UI.** English / हिंदी switcher, saved to the account so alerts and the IVR follow it. Search understands Hinglish and Devanagari ("gaadi chalana", "बिजली मिस्त्री"), and voice search uses the browser's speech recognition.
 - **Offline-first PWA.** Installable; job pages and searches you have seen work offline, and an application made offline is sent when the connection returns ([ADR 0009](docs/adr/0009-vernacular-ux-and-offline-pwa.md)).
 - **Fake-job protection.** Every posting gets an explainable risk score (fee requests in three scripts, unrealistic pay, off-platform contact, new or unverified employer). Risky jobs wait in an admin queue; enough user reports send a live job back to review ([ADR 0007](docs/adr/0007-trust-and-moderation.md)).
@@ -164,7 +165,7 @@ cd naukrinearby
 
 Frontend: `npm run lint`, `npm run build`, `npm run start`.
 
-To exercise real extraction instead of the stub, set `EXTRACTION_PROVIDER=gpt5mini` and `LLM_API_KEY` in `.env`. Other live adapters (`EMBEDDING_PROVIDER=remote`, `TRANSLATION_PROVIDER=bhashini`, `OTP_PROVIDER=twilio`, `TWILIO_PROVIDER=twilio`, `VISION_PROVIDER=llm`, `GEOCODER=nominatim`) are the same kind of switch. Embedding width must stay `1024` so vectors match the pgvector column.
+To exercise real extraction instead of the stub, set `EXTRACTION_PROVIDER=gpt5mini` and `LLM_API_KEY` in `.env`. Other live adapters (`EMBEDDING_PROVIDER=remote`, `TRANSLATION_PROVIDER=bhashini` with `BHASHINI_USER_ID`/`BHASHINI_ULCA_API_KEY`/`BHASHINI_PIPELINE_ID` from the ULCA profile, `OTP_PROVIDER=twilio`, `TWILIO_PROVIDER=twilio`, `VISION_PROVIDER=llm`, `GEOCODER=nominatim`) are the same kind of switch. Embedding width must stay `1024` so vectors match the pgvector column.
 
 ## Review-quality eval gate
 

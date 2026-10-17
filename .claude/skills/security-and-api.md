@@ -207,7 +207,7 @@ turned on** (`CookieCsrfTokenRepository` + the SPA handler) for every cookie-aut
 
 ### A.6 Secrets & configuration
 
-- All credentials (LLM API key, Twilio SID/token, Bhashini key, JWT keys, DB password, object-storage keys)
+- All credentials (LLM API key, Twilio SID/token, Bhashini `userID`/`ulcaApiKey`/pipeline ID, JWT keys, DB password, object-storage keys)
   come from environment variables via `@ConfigurationProperties` records — never hardcoded, never in
   `application.yml` committed to git. The repo ships an `.env.example` with empty placeholders only.
 - The JWT signing key (RS256 private key) is an injected secret, not a checked-in file. In
@@ -304,7 +304,8 @@ DASHBOARD
   GET    /api/employer/dashboard/stats                                → 200 DashboardStatsDTO
 
 DIFFERENTIATORS (ADRs 0007–0009)
-  PUT    /api/auth/me/language         { language }                    → 204  (en | hi | ta | te | bn | mr)
+  PUT    /api/auth/me/language         { language }                    → 204  (en | hi | ta | te | bn | mr | kn | gu)
+  GET    /api/jobs/{slug}/translation?lang=xx                         → 200 JobTranslationResponse (public; 400 bad lang; 404 not public)
   GET    /api/employer/profile                                        → 200 EmployerProfileResponse (incl. trustLevel)
   PUT    /api/employer/profile         EmployerProfileRequest          → 200  (GSTIN → GstVerifier)
   POST   /api/jobs/{id}/report         { reason, details? }             → 201 / 409 (already reported)  (auth)

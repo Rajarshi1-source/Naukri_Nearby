@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 public class StubTranslationProvider implements TranslationProvider {
 
 	@Override
-	public String translate(String text, String targetLanguageCode) {
+	public String translate(String text, String sourceLanguageCode, String targetLanguageCode) {
 		return text;
 	}
 

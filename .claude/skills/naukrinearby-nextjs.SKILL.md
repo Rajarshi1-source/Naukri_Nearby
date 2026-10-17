@@ -385,6 +385,10 @@ export default nextConfig;
 - `ReportJobButton` (signed-in, any role) → `POST /api/jobs/{id}/report`; `409` = already reported.
 - Employer post form shows the moderation outcome: `PENDING_REVIEW` with `riskReasons` from the
   create response.
+- `JobTranslationPanel` ("Read this job in …") → `GET /api/jobs/{slug}/translation?lang=` (public,
+  server-side Bhashini, cached per job version). Default to the UI locale when it is not English, label
+  the result as machine-translated, keep the original visible, and show "not available" when
+  `translated=false`. Never call Bhashini from the browser.
 - `SkillGapPanel` (candidate only) → `GET /api/candidate/jobs/{id}/skill-gap`; links open official
   portals in a new tab with `rel="noopener noreferrer"`.
 - Candidate dashboard holds consent toggles (`/api/candidate/consents`), data export (download the

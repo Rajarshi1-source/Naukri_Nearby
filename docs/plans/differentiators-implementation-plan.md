@@ -133,6 +133,16 @@ Tests (Testcontainers + `RestTestClient`, plus plain unit tests):
 | Dependabot npm (next, sharp, postcss, nanoid, js-yaml, brace-expansion, browserslist, baseline-browser-mapping, source-map-js) | `next@16.4.x`, `eslint-config-next` to match, `overrides` for transitive pins, `npm audit` clean; supersedes Dependabot PR #1 |
 | Dependabot pip `requests` | bump in `eval/requirements.txt` |
 
+## 4b. Addendum (2026-10-17): Bhashini pipeline + job translation
+- The original `BhashiniTranslationProvider` posted to a generic `/translate` path that Bhashini does
+  not expose. It now implements the documented ULCA pipeline (config call → compute call), with the
+  config cached per language pair. Env: `BHASHINI_USER_ID`, `BHASHINI_ULCA_API_KEY`,
+  `BHASHINI_PIPELINE_ID` (replacing `BHASHINI_BASE_URL`/`BHASHINI_API_KEY`).
+- New: cached job-description translation (`GET /api/jobs/{slug}/translation`) and a "Read this job
+  in" picker on the job page.
+- Follow-up (separate PR): Bhashini ASR for voice search where the browser has no speech recognition
+  (and for the IVR), and Bhashini TTS for a "Listen" button on job pages.
+
 ## 5. Definition of done
 - All features reachable in the UI and covered by backend tests.
 - `./gradlew build`, `npm run lint`, `npm run build`, and Playwright pass locally; CI has the E2E job.

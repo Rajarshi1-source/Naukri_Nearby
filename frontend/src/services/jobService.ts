@@ -1,6 +1,8 @@
 import { api, serverGet } from "@/lib/api";
 import {
   JobResponseSchema,
+  JobTranslationSchema,
+  type JobTranslation,
   SearchResponseSchema,
   type JobResponse,
   type SearchResponse,
@@ -35,6 +37,15 @@ export const jobService = {
       auth: false,
     });
     return SearchResponseSchema.parse(raw);
+  },
+
+  /** Public, cached per job version on the server (Bhashini). `translated=false` = original returned. */
+  async translation(slug: string, lang: string): Promise<JobTranslation> {
+    const raw = await api<unknown>(
+      `/api/jobs/${encodeURIComponent(slug)}/translation?lang=${encodeURIComponent(lang)}`,
+      { auth: false },
+    );
+    return JobTranslationSchema.parse(raw);
   },
 
   /** Server-safe single-job fetch for SSR. Returns null on 404. */

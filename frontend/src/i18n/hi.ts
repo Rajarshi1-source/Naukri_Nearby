@@ -63,6 +63,10 @@ export const hi: Dictionary = {
     salaryHidden: "वेतन नहीं बताया गया",
     employerSince: "{date} से नौकरी नियरबाय पर",
     notFound: "नौकरी नहीं मिली",
+    readIn: "यह नौकरी इस भाषा में पढ़ें",
+    translatedNote: "भाषिणी से मशीन अनुवाद। इसमें गलतियां हो सकती हैं; मूल विवरण ऊपर है।",
+    translating: "अनुवाद हो रहा है…",
+    translationUnavailable: "अनुवाद अभी उपलब्ध नहीं है।",
   },
   apply: {
     apply: "अभी आवेदन करें",

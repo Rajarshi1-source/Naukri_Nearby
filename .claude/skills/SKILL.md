@@ -146,22 +146,34 @@ RestTemplate/WebClient boilerplate:
 
 ```java
 @HttpExchange(url = "/v1", accept = "application/json")
-public interface BhashiniClient {
-    @PostExchange("/translate")
-    TranslationResponse translate(@RequestBody TranslationRequest req);
+public interface EmbeddingClient {
+    @PostExchange("/embeddings")
+    EmbeddingResponse embed(@RequestBody EmbeddingRequest req);
 }
 
 @Configuration
 class HttpClientsConfig {
     @Bean
-    BhashiniClient bhashiniClient(RestClient.Builder builder, TranslationProperties props) {
+    EmbeddingClient embeddingClient(RestClient.Builder builder, EmbeddingProperties props) {
         RestClient client = builder.baseUrl(props.baseUrl())
-                .defaultHeader("Authorization", props.apiKey()).build();
+                .defaultHeader("Authorization", "Bearer " + props.apiKey()).build();
         return HttpServiceProxyFactory.builderFor(RestClientAdapter.create(client))
-                .build().createClient(BhashiniClient.class);
+                .build().createClient(EmbeddingClient.class);
     }
 }
 ```
+
+**Bhashini is not a single REST endpoint.** It is the ULCA *pipeline* API (verified against
+bhashini.gitbook.io/bhashini-apis): (1) **config call** `POST
+https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline` with headers `userID` +
+`ulcaApiKey` and body `pipelineTasks[{taskType, config.language}]` + `pipelineRequestConfig.pipelineId`;
+the response gives `pipelineResponseConfig[].config[].serviceId` and
+`pipelineInferenceAPIEndPoint.{callbackUrl, inferenceApiKey{name,value}}`; (2) **compute call** `POST
+callbackUrl` with header `inferenceApiKey.name: value`, body `pipelineTasks[{taskType,
+config:{language, serviceId}}]` + `inputData.input[{source}]` (ASR: `inputData.audio[{audioContent}]`);
+result at `pipelineResponse[0].output[0].target` (TTS: `pipelineResponse[0].audio[0].audioContent`).
+`BhashiniTranslationProvider` caches the config per language pair (`naukri.translation.config-ttl`) and
+drops it on a 401/403 from compute. Never call Bhashini from the browser — the keys stay server-side.
 
 The provider-agnostic interface stays as the plan defines it; the HTTP client is the implementation
 detail behind each provider (`Gpt5MiniProvider`, `ClaudeHaikuProvider`, etc.):
@@ -459,6 +471,7 @@ and runbook expect.
 | Skill gap | `service.SkillGapService` → `SkillGapResponse(matched, missing, suggestions)`; portals from `resources/trust/learning-portals.tsv` (official portals only, never invented course URLs) | `GET /api/candidate/jobs/{id}/skill-gap` |
 | DPDP consent + export | `Consent` entity (append-only ledger, latest row per purpose wins), `ConsentPurpose` enum `RESUME_PROCESSING`, `WHATSAPP_ALERTS`; `service.ConsentService`; export in `AccountService` | `GET/PUT /api/candidate/consents`, `GET /api/candidate/account/export` |
 | Language | `PUT /api/auth/me/language` updates `users.preferred_language` (`en`, `hi`, …) | — |
+| Job translation | `service.JobTranslationService` → `JobTranslationResponse`; Bhashini via `TranslationService.translate(text, source, target)` (Optional); Redis `jobtr:{jobId}:v{version}:{lang}`, only successful translations cached; source `hi` if Devanagari | `GET /api/jobs/{slug}/translation?lang=` (public, approved jobs only); `naukri.translation.job-cache-ttl` |
 | IVR apply | `service.IvrService` (Redis state `ivr:call:{CallSid}`, TTL 15 min), `controller.IvrController`; TwiML built by `util.TwiML` (shared with the WhatsApp reply) | `POST /api/webhooks/twilio/voice`, `POST /api/webhooks/twilio/voice/gather/{menu|job|confirm}` (step is a path segment so the signed URL is the plain request URL); TwiML responses use `TwiML.CONTENT_TYPE` (explicit UTF-8, or Hindi is garbled) |
 | Parse bulkhead | `@EnableResilientMethods` on a config class; `@ConcurrencyLimit` on the resume-parse entry point | `naukri.resume.parse-concurrency` (default 4) |
 | LLM tracing | `generation.LlmTracer` port: `LogLlmTracer` (`log`), `LangfuseLlmTracer` (`langfuse`, ingestion API, async, failures swallowed), `NoopLlmTracer` (`none`, default) | `naukri.llm-trace.*` (`LLM_TRACER`, `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`) |

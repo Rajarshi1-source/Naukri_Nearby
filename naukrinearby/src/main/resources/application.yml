@@ -118,11 +118,16 @@ naukri:
     dims: ${EMBEDDING_DIMS:1024}
     base-url: ${EMBEDDING_BASE_URL:}
     api-key: ${EMBEDDING_API_KEY:}
+  # Bhashini ULCA pipeline API (config call -> compute call). Credentials from the ULCA "My Profile" page.
   translation:
     provider: ${TRANSLATION_PROVIDER:stub}
-    base-url: ${BHASHINI_BASE_URL:}
-    api-key: ${BHASHINI_API_KEY:}
+    config-url: ${BHASHINI_CONFIG_URL:https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline}
+    user-id: ${BHASHINI_USER_ID:}
+    ulca-api-key: ${BHASHINI_ULCA_API_KEY:}
+    pipeline-id: ${BHASHINI_PIPELINE_ID:}
     timeout: 10s
+    config-ttl: 1h
+    job-cache-ttl: 7d
   twilio:
     provider: ${TWILIO_PROVIDER:stub}
     account-sid: ${TWILIO_ACCOUNT_SID:}
