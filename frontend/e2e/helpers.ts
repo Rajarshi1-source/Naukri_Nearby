@@ -1,3 +1,5 @@
+import { randomInt } from "node:crypto";
+
 import { expect, type APIRequestContext, type BrowserContext, type Page } from "@playwright/test";
 
 export const API_URL = process.env.E2E_API_URL ?? "http://localhost:8080";
@@ -6,7 +8,7 @@ export const OTP = process.env.E2E_OTP ?? "123456";
 
 /** A fresh Indian mobile number per call, so OTP rate limits (5/hour/phone) never trip. */
 export function randomPhone(): string {
-  return "9" + String(Math.floor(Math.random() * 1e9)).padStart(9, "0");
+  return "9" + String(randomInt(1_000_000_000)).padStart(9, "0");
 }
 
 export interface Session {
@@ -82,7 +84,7 @@ export async function waitUntilSearchable(
   await expect
     .poll(
       async () => {
-        const size = 20 + Math.floor(Math.random() * 30);
+        const size = 20 + randomInt(30);
         const res = await request.get(
           `${API_URL}/api/jobs/search?lat=${point.lat}&lng=${point.lng}&radius=5&size=${size}`,
         );
@@ -96,7 +98,8 @@ export async function waitUntilSearchable(
 
 /** A random point inside India, so this run's jobs are the only ones within a few km. */
 export function randomIndianPoint(): { lat: number; lng: number } {
-  return { lat: 21 + Math.random() * 5, lng: 75 + Math.random() * 6 };
+  // node:crypto rather than Math.random (CodeQL js/insecure-randomness); 1e-6 degree steps.
+  return { lat: 21 + randomInt(5_000_000) / 1e6, lng: 75 + randomInt(6_000_000) / 1e6 };
 }
 
 export async function switchLanguage(page: Page, label: "English" | "हिंदी") {
