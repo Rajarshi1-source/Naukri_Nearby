@@ -62,3 +62,46 @@ and restart. Embedding dims must stay 1024 to match the pgvector column. No code
 `DELETE /api/candidate/account` cascades all DB rows and purges the resume object from object storage (RustFS). To erase
 on request from ops, delete the `users` row (FKs cascade) and call `FileStorageService.delete(key)` for
 the stored `resume_file_key`.
+As of `V6__consents_and_erasure.sql`, `notification_logs` cascades too (it used to block deleting a
+user who had received an alert). The user's `consents` ledger is erased with the account.
+
+## Data export (DPDP right to access)
+Candidates download their data from the dashboard (`GET /api/candidate/account/export`, JSON:
+account, profile, applications, saved jobs, alert settings, alerts received, consent history). For a
+request that arrives by email or phone, verify the requester owns the number, then produce the same
+document with `AccountService.export(userId)` from an ops shell.
+
+## Consent ledger (DPDP notice and consent)
+- Table `consents` is append-only; the newest row per `(user_id, purpose)` is the current state.
+- `WHATSAPP_ALERTS` withdrawn → the notification worker skips the user (counted as processed, no DLQ).
+- `RESUME_PROCESSING` is recorded automatically when a candidate uploads a resume or starts the
+  WhatsApp chat (`notice_version` says which notice they saw).
+- Audit a user: `SELECT purpose, granted, notice_version, created_at FROM consents WHERE user_id = ? ORDER BY created_at DESC;`
+
+## Moderation queue (ADR 0007)
+Admins are the phones in `NAUKRI_ADMIN_PHONES`; they get `ROLE_ADMIN` at their next OTP login and use
+`/admin/moderation` in the web app (`/api/admin/moderation/**`).
+- Queue size: `SELECT count(*) FROM jobs WHERE moderation_status = 'PENDING_REVIEW';` — alert if the
+  oldest pending job is older than a working day.
+- Tuning: `TRUST_REVIEW_THRESHOLD` (default 50) and `TRUST_REPORT_THRESHOLD` (default 3). Phrase lists
+  are data files in `src/main/resources/trust/` (payment and get-rich-quick phrases in English,
+  Hinglish and Devanagari); add a phrase there, not in code.
+- Every decision goes through the outbox, so an approval becomes searchable within the sync interval
+  and releases the candidate alerts that were held back. A rejected job stays in Postgres (for the
+  employer and audit) but is never indexed.
+- Bulk re-check after changing rules: editing a job re-scores it; there is no batch re-score job.
+
+## IVR (voice apply, ADR 0008)
+Point the Twilio phone number's **Voice** webhook (HTTP POST) at
+`https://<public-host>/api/webhooks/twilio/voice`. The gather steps are relative URLs under
+`/api/webhooks/twilio/voice/gather/{menu|job|confirm}`. With `TWILIO_PROVIDER=twilio` and
+`TWILIO_AUTH_TOKEN` set, every request must carry a valid `X-Twilio-Signature`; behind a proxy, make
+sure the public scheme/host reach the app (forwarded headers), or signatures will not match.
+Call state is in Redis (`ivr:call:{CallSid}`, 15 min TTL).
+
+## Parse bulkhead and LLM tracing
+- `RESUME_PARSE_CONCURRENCY` (default 4) caps concurrent resume parses (`@ConcurrencyLimit`); extra
+  uploads wait in `PENDING`. Raise it with LLM quota, not CPU.
+- `LLM_TRACER=langfuse` with `LANGFUSE_HOST`/`LANGFUSE_PUBLIC_KEY`/`LANGFUSE_SECRET_KEY` sends one
+  trace per parse (metadata only: provider, model, prompt version, latency, JSON validity, sizes).
+  `LLM_TRACER=log` writes the same as a log line.

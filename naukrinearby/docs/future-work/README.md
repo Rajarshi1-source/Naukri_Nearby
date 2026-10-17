@@ -1,5 +1,12 @@
 # Future Work (deferred from the Backend MVP)
 
+> **Status (2026-10-17):** everything below except the "Still open" list is now built — see
+> `docs/plans/differentiators-implementation-plan.md` and ADRs 0007–0009. Kept as a backlog note.
+>
+> **Still open:** Bhashini ASR/TTS for the IVR (Twilio speech is used today), a GSP/government GSTIN
+> API behind `GstVerifier`, an ML fraud classifier behind `JobRiskScorer`, more UI languages
+> (dictionary files), push notifications, an `XAUTOCLAIM` sweeper for Redis Streams.
+
 These were intentionally scoped out of the MVP (see the plan's "Scope" section). The architecture
 already accommodates them behind existing seams (provider adapters, the outbox, config flags).
 

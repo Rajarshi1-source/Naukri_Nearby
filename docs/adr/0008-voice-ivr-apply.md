@@ -11,7 +11,10 @@ through alerts, posters, or word of mouth with a job number.
 ## Decision
 - **Twilio Programmable Voice webhooks** return TwiML:
   - `POST /api/webhooks/twilio/voice` — bilingual greeting (हिंदी first, then English) and main menu.
-  - `POST /api/webhooks/twilio/voice/gather?step=…` — handles each `<Gather>` result.
+  - `POST /api/webhooks/twilio/voice/gather/{menu|job|confirm}` — handles each `<Gather>` result. The
+    step is a path segment, not a query parameter, so the URL Twilio signs is the plain request URL.
+  - Responses are `application/xml;charset=UTF-8`; without the explicit charset the Hindi prompts are
+    garbled.
 - **Menu:** `1` apply to a job by number (DTMF digits then `#`, or spoken digits), confirm with `1`;
   `2` hear the three best jobs near the caller's saved profile location; `9` repeat.
 - **Speech + DTMF** via `<Gather input="dtmf speech" language="hi-IN">`, using Twilio's built-in
