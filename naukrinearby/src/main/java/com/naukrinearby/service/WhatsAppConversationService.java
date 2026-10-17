@@ -9,6 +9,7 @@ import java.util.regex.Pattern;
 import com.naukrinearby.exception.DuplicateApplicationException;
 import com.naukrinearby.model.dto.ResumeParseResult;
 import com.naukrinearby.model.entity.User;
+import com.naukrinearby.model.enums.ConsentPurpose;
 import com.naukrinearby.util.PhoneNumberValidator;
 
 import lombok.RequiredArgsConstructor;
@@ -30,8 +31,11 @@ public class WhatsAppConversationService {
 
 	private static final Duration SESSION_TTL = Duration.ofMinutes(30);
 	private static final String SESSION = "wa:session:";
-	private static final Pattern APPLY_JOB = Pattern.compile("(?:apply|aavedan)\\D*(\\d+)",
+	/** Bounded quantifiers keep this linear on hostile input (CodeQL java/polynomial-redos). */
+	private static final Pattern APPLY_JOB = Pattern.compile("(?:apply|aavedan)\\D{0,20}?(\\d{1,12})",
 			Pattern.CASE_INSENSITIVE);
+	/** Inbound messages are capped before any parsing; a chat answer is never this long. */
+	static final int MAX_MESSAGE_CHARS = 1000;
 	private static final Pattern DEVANAGARI = Pattern.compile("[\\u0900-\\u097F]");
 
 	private final StringRedisTemplate redis;
@@ -39,6 +43,7 @@ public class WhatsAppConversationService {
 	private final ResumeExtractionService extractionService;
 	private final CandidateProfileService profileService;
 	private final ApplicationService applicationService;
+	private final ConsentService consentService;
 
 	private enum State {
 		ASK_NAME, ASK_SKILLS, ASK_EXPERIENCE
@@ -54,6 +59,9 @@ public class WhatsAppConversationService {
 			return "Sorry, we couldn't read your number. / माफ़ कीजिए, आपका नंबर नहीं पढ़ पाए।";
 		}
 		String text = body == null ? "" : body.trim();
+		if (text.length() > MAX_MESSAGE_CHARS) {
+			text = text.substring(0, MAX_MESSAGE_CHARS);
+		}
 		String key = SESSION + phone;
 		Map<Object, Object> session = redis.opsForHash().entries(key);
 
@@ -109,6 +117,10 @@ public class WhatsAppConversationService {
 		User user;
 		try {
 			user = authService.getOrCreateCandidate(phone);
+			// The candidate started this chat to share their details for a profile: record that
+			// consent in the DPDP ledger before processing them.
+			consentService.grantIfAbsent(user.getId(), ConsentPurpose.RESUME_PROCESSING,
+					ConsentService.WHATSAPP_NOTICE_VERSION);
 			ResumeParseResult result = extractionService.extract(transcript);
 			if (name != null && !name.isBlank()) {
 				result.setName(name.trim());

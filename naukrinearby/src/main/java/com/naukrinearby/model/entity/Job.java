@@ -4,6 +4,7 @@ import java.time.Instant;
 
 import com.naukrinearby.model.enums.JobCategory;
 import com.naukrinearby.model.enums.JobStatus;
+import com.naukrinearby.model.enums.ModerationStatus;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -106,6 +107,24 @@ public class Job {
 	@Column(name = "expires_at")
 	private Instant expiresAt;
 
+	/** Gates public reads and the search index (ADR 0007); the row itself is always stored. */
+	@Enumerated(EnumType.STRING)
+	@Column(name = "moderation_status", nullable = false)
+	private ModerationStatus moderationStatus = ModerationStatus.APPROVED;
+
+	@Column(name = "risk_score", nullable = false)
+	private Integer riskScore = 0;
+
+	@JdbcTypeCode(SqlTypes.ARRAY)
+	@Column(name = "risk_reasons", columnDefinition = "text[]", nullable = false)
+	private String[] riskReasons = new String[0];
+
+	@Column(name = "moderated_at")
+	private Instant moderatedAt;
+
+	@Column(name = "moderation_note", columnDefinition = "text")
+	private String moderationNote;
+
 	@CreationTimestamp
 	@Column(name = "created_at", updatable = false)
 	private Instant createdAt;
@@ -113,4 +132,9 @@ public class Job {
 	@UpdateTimestamp
 	@Column(name = "updated_at")
 	private Instant updatedAt;
+
+	/** True when the job may be shown to the public: open for applications and approved. */
+	public boolean isPubliclyVisible() {
+		return status == JobStatus.ACTIVE && moderationStatus == ModerationStatus.APPROVED;
+	}
 }

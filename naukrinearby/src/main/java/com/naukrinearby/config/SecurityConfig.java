@@ -38,8 +38,10 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http
-				// Safe because the API is stateless and the JWT travels in the Authorization
-				// header (no cookie-based session to forge).
+				// CSRF is deliberately off (security-and-api.md §A.5c): every authenticated request carries
+				// the JWT in the Authorization header, which a cross-site form or image cannot set, and no
+				// cookie authenticates a request (nn_session is only a UI routing hint). Twilio webhooks
+				// are authenticated by signature. If auth ever moves to cookies, turn CSRF on.
 				.csrf(csrf -> csrf.disable())
 				.cors(Customizer.withDefaults())
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -60,6 +62,7 @@ public class SecurityConfig {
 						// path on any other port still falls through to the ADMIN rule below.
 						.requestMatchers(managementPortScrapeMatcher).permitAll()
 						.requestMatchers("/actuator/**").hasRole("ADMIN")
+						.requestMatchers("/api/admin/**").hasRole("ADMIN")
 						.requestMatchers("/api/employer/**").hasRole("EMPLOYER")
 						.requestMatchers("/api/candidate/**").hasRole("CANDIDATE")
 						.anyRequest().authenticated())

@@ -11,6 +11,7 @@ import com.naukrinearby.model.entity.Job;
 import com.naukrinearby.repository.JobRepository;
 import com.naukrinearby.service.SearchService;
 import com.naukrinearby.service.search.HybridSearchStrategy;
+import com.naukrinearby.service.search.QueryNormalizer;
 import com.naukrinearby.service.search.SearchRankingStrategy;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -53,7 +54,7 @@ class SearchServiceFallbackTest {
 		SearchProperties props = new SearchProperties("jobs", Duration.ofMinutes(5), 20, "geo", 50, 60);
 		SearchService service = new SearchService(es, jobRepo, mock(SearchRankingStrategy.class),
 				mock(HybridSearchStrategy.class), props, redis, new JsonMapper(),
-				new SimpleMeterRegistry());
+				new SimpleMeterRegistry(), new QueryNormalizer());
 
 		SearchResponse response = service.search(new SearchQuery("plumber", 26.84, 80.94, 10, null, 20));
 

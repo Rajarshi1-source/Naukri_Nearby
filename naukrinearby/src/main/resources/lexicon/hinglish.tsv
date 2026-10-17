@@ -1,0 +1,120 @@
+# Query normalization lexicon (plan D9): variant<TAB>canonical. Lower-case. Multi-word variants allowed
+# (up to 3 words). Canonical terms are the English words used in job titles and skills.
+# A canonical of "-" marks a filler word that is dropped from the query.
+naukri	-
+naukari	-
+job	-
+jobs	-
+kaam	-
+kam	-
+chahiye	-
+chaiye	-
+chahie	-
+ki	-
+ka	-
+ke	-
+mein	-
+me	-
+mujhe	-
+ke paas	-
+paas	-
+near	-
+near me	-
+नौकरी	-
+काम	-
+चाहिए	-
+मुझे	-
+की	-
+का	-
+के	-
+में	-
+पास	-
+# delivery
+delivery boy	delivery
+delivery wala	delivery
+delivery ka kaam	delivery
+courier	delivery
+डिलीवरी	delivery
+डिलीवरी बॉय	delivery
+# driving
+gaadi chalana	driving
+gadi chalana	driving
+gaadi	driving
+gadi	driving
+chalak	driver
+ड्राइवर	driver
+चालक	driver
+गाड़ी चलाना	driving
+# electrical
+bijli mistri	electrician
+bijli wala	electrician
+bijli ka kaam	electrician
+wiring	electrician
+बिजली मिस्त्री	electrician
+बिजली	electrician
+इलेक्ट्रीशियन	electrician
+# plumbing
+nal mistri	plumber
+nal wala	plumber
+plumbing	plumber
+नल मिस्त्री	plumber
+प्लंबर	plumber
+# carpentry
+badhai	carpenter
+barhai	carpenter
+बढ़ई	carpenter
+# cooking
+khana banana	cook
+rasoiya	cook
+bawarchi	cook
+halwai	cook
+रसोइया	cook
+बावर्ची	cook
+खाना बनाना	cook
+# security
+chowkidar	security guard
+chaukidar	security guard
+guard	security guard
+चौकीदार	security guard
+गार्ड	security guard
+# housekeeping
+safai	housekeeping
+safai wala	housekeeping
+safai karmachari	housekeeping
+सफाई	housekeeping
+# tailoring
+darzi	tailor
+silai	tailoring
+सिलाई	tailoring
+दर्जी	tailor
+# retail / sales
+dukaan	retail
+dukaan pe kaam	retail sales assistant
+dukan	retail
+salesman	sales
+सेल्समैन	sales
+दुकान	retail
+# accounting
+hisab kitab	accounting
+hisaab	accounting
+munim	accountant
+munshi	accountant
+टैली	tally
+हिसाब	accounting
+मुनीम	accountant
+# data entry
+computer operator	data entry
+typing	data entry
+कंप्यूटर ऑपरेटर	data entry
+# construction
+mazdoor	construction
+majdoor	construction
+rajmistri	mason
+raj mistri	mason
+मज़दूर	construction
+मजदूर	construction
+राजमिस्त्री	mason
+# teaching
+shikshak	teacher
+tuition	teacher
+शिक्षक	teacher

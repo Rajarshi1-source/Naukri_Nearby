@@ -37,28 +37,28 @@ public class JobController {
 	@ResponseStatus(HttpStatus.CREATED)
 	public JobResponse create(@Valid @RequestBody JobCreateRequest req,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return JobResponse.from(jobService.createJob(req, principal.id()));
+		return JobResponse.forOwner(jobService.createJob(req, principal.id()));
 	}
 
 	@PutMapping("/api/jobs/{id}")
 	@PreAuthorize("hasRole('EMPLOYER')")
 	public JobResponse update(@PathVariable Long id, @Valid @RequestBody JobUpdateRequest req,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return JobResponse.from(jobService.updateJob(id, req, principal.id()));
+		return JobResponse.forOwner(jobService.updateJob(id, req, principal.id()));
 	}
 
 	@PatchMapping("/api/jobs/{id}/status")
 	@PreAuthorize("hasRole('EMPLOYER')")
 	public JobResponse updateStatus(@PathVariable Long id, @Valid @RequestBody JobStatusUpdateRequest req,
 			@AuthenticationPrincipal AuthPrincipal principal) {
-		return JobResponse.from(jobService.updateStatus(id, req.status(), principal.id()));
+		return JobResponse.forOwner(jobService.updateStatus(id, req.status(), principal.id()));
 	}
 
 	/** Read-your-writes: the employer's own jobs are read from Postgres, not ES (master plan §9.5). */
 	@GetMapping("/api/employer/jobs")
 	@PreAuthorize("hasRole('EMPLOYER')")
 	public PageResponse<JobResponse> myJobs(Pageable pageable, @AuthenticationPrincipal AuthPrincipal principal) {
-		return PageResponse.from(jobService.employerJobs(principal.id(), pageable), JobResponse::from);
+		return PageResponse.from(jobService.employerJobs(principal.id(), pageable), JobResponse::forOwner);
 	}
 
 	@GetMapping("/api/employer/dashboard/stats")

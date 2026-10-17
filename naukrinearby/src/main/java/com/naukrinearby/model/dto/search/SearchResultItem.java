@@ -9,5 +9,6 @@ public record SearchResultItem(
 		String companyName,
 		Integer salaryMin,
 		Integer salaryMax,
-		Double distanceKm) {
+		Double distanceKm,
+		String trustLevel) {
 }

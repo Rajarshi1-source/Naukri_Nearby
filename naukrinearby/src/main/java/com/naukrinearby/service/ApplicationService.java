@@ -3,18 +3,24 @@ package com.naukrinearby.service;
 import java.util.EnumMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import com.naukrinearby.exception.DuplicateApplicationException;
 import com.naukrinearby.exception.ForbiddenException;
 import com.naukrinearby.exception.NotFoundException;
 import com.naukrinearby.exception.ValidationException;
+import com.naukrinearby.model.dto.application.ApplicationResponse;
 import com.naukrinearby.model.entity.Application;
 import com.naukrinearby.model.entity.Job;
+import com.naukrinearby.model.entity.User;
 import com.naukrinearby.model.enums.ApplicationStatus;
 import com.naukrinearby.model.enums.JobStatus;
+import com.naukrinearby.model.enums.ModerationStatus;
 import com.naukrinearby.repository.ApplicationRepository;
 import com.naukrinearby.repository.EmployerRepository;
 import com.naukrinearby.repository.JobRepository;
+import com.naukrinearby.repository.UserRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -34,6 +40,7 @@ public class ApplicationService {
 	private final ApplicationRepository applicationRepo;
 	private final JobRepository jobRepo;
 	private final EmployerRepository employerRepo;
+	private final UserRepository userRepo;
 
 	/** Allowed application status transitions (employer-driven). Terminal states have no successors. */
 	private static final Map<ApplicationStatus, Set<ApplicationStatus>> TRANSITIONS = buildTransitions();
@@ -54,6 +61,7 @@ public class ApplicationService {
 	@Transactional
 	public Application apply(Long jobId, Long candidateId, String coverNote) {
 		Job job = jobRepo.findById(jobId)
+				.filter(j -> j.getModerationStatus() == ModerationStatus.APPROVED)
 				.orElseThrow(() -> new NotFoundException("Job not found: " + jobId));
 		if (job.getStatus() != JobStatus.ACTIVE) {
 			throw new ValidationException("This job is no longer accepting applications");
@@ -72,9 +80,22 @@ public class ApplicationService {
 		}
 	}
 
+	/** The candidate's applications with job title and slug (one batched job lookup, no N+1). */
 	@Transactional(readOnly = true)
-	public Page<Application> myApplications(Long candidateId, Pageable pageable) {
-		return applicationRepo.findByCandidateIdOrderByAppliedAtDesc(candidateId, pageable);
+	public Page<ApplicationResponse> myApplicationViews(Long candidateId, Pageable pageable) {
+		Page<Application> page = applicationRepo.findByCandidateIdOrderByAppliedAtDesc(candidateId, pageable);
+		Map<Long, Job> jobs = jobRepo.findAllById(page.map(Application::getJobId).toList()).stream()
+				.collect(Collectors.toMap(Job::getId, Function.identity()));
+		return page.map(a -> ApplicationResponse.from(a, jobs.get(a.getJobId()), null));
+	}
+
+	/** Applicants for the employer's own job, with name and phone so they can be contacted. */
+	@Transactional(readOnly = true)
+	public Page<ApplicationResponse> applicantViews(Long jobId, Long employerUserId, Pageable pageable) {
+		Page<Application> page = applicantsForJob(jobId, employerUserId, pageable);
+		Map<Long, User> users = userRepo.findAllById(page.map(Application::getCandidateId).toList()).stream()
+				.collect(Collectors.toMap(User::getId, Function.identity()));
+		return page.map(a -> ApplicationResponse.from(a, null, users.get(a.getCandidateId())));
 	}
 
 	@Transactional(readOnly = true)

@@ -62,7 +62,9 @@ public class ElasticsearchIndexBootstrap {
 			      "company_name":{ "type": "text", "fields": { "keyword": { "type": "keyword" } } },
 			      "location":    { "type": "geo_point" },
 			      "created_at":  { "type": "date" },
-			      "slug":        { "type": "keyword" }
+			      "slug":        { "type": "keyword" },
+			      "moderation_status": { "type": "keyword" },
+			      "trust_level": { "type": "keyword" }
 			    }
 			  }
 			}

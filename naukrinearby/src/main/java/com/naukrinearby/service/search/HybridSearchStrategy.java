@@ -13,6 +13,7 @@ import com.naukrinearby.model.dto.search.SearchQuery;
 import com.naukrinearby.model.dto.search.SearchResponse;
 import com.naukrinearby.model.dto.search.SearchResultItem;
 import com.naukrinearby.model.entity.Job;
+import com.naukrinearby.model.enums.TrustLevel;
 import com.naukrinearby.repository.JobRepository;
 import com.naukrinearby.service.EmbeddingService;
 
@@ -121,6 +122,7 @@ public class HybridSearchStrategy {
 		return new SearchResultItem(
 				job.getId(), job.getTitle(), job.getSlug(),
 				job.getCategory() == null ? null : job.getCategory().name(),
-				job.getCity(), company, job.getSalaryMin(), job.getSalaryMax(), distanceKm);
+				job.getCity(), company, job.getSalaryMin(), job.getSalaryMax(), distanceKm,
+				TrustLevel.of(job.getEmployer()).name());
 	}
 }

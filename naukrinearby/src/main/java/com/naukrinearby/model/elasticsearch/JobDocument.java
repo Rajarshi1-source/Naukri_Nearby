@@ -6,6 +6,8 @@ import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.naukrinearby.model.entity.Job;
+import com.naukrinearby.model.enums.ModerationStatus;
+import com.naukrinearby.model.enums.TrustLevel;
 import com.naukrinearby.util.GeoUtils;
 
 /** The Elasticsearch document shape for a job (master plan §8.4). Serialized into outbox payloads. */
@@ -24,7 +26,9 @@ public record JobDocument(
 		@JsonProperty("company_name") String companyName,
 		GeoPoint location,
 		@JsonProperty("created_at") Instant createdAt,
-		String slug) {
+		String slug,
+		@JsonProperty("moderation_status") String moderationStatus,
+		@JsonProperty("trust_level") String trustLevel) {
 
 	/** Elasticsearch geo_point — serialized as {"lat":..,"lon":..}. */
 	public record GeoPoint(double lat, double lon) {
@@ -41,6 +45,8 @@ public record JobDocument(
 				j.getCity(), j.getState(), j.getPincode(),
 				j.getSalaryMin(), j.getSalaryMax(),
 				j.getStatus() == null ? null : j.getStatus().name(),
-				company, loc, j.getCreatedAt(), j.getSlug());
+				company, loc, j.getCreatedAt(), j.getSlug(),
+				j.getModerationStatus() == null ? ModerationStatus.APPROVED.name() : j.getModerationStatus().name(),
+				TrustLevel.of(j.getEmployer()).name());
 	}
 }

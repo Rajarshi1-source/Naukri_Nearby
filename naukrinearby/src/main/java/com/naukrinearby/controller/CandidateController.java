@@ -1,23 +1,32 @@
 package com.naukrinearby.controller;
 
 import java.util.List;
+import java.util.Map;
 
 import com.naukrinearby.exception.NotFoundException;
 import com.naukrinearby.model.dto.CandidateProfileResponse;
+import com.naukrinearby.model.dto.ConsentDto;
 import com.naukrinearby.model.dto.DashboardStatsDTO;
 import com.naukrinearby.model.dto.NotificationPreferenceDto;
 import com.naukrinearby.model.dto.ProfileUpdateRequest;
+import com.naukrinearby.model.dto.SkillGapResponse;
 import com.naukrinearby.model.dto.job.JobResponse;
 import com.naukrinearby.model.entity.CandidateProfile;
 import com.naukrinearby.security.AuthPrincipal;
 import com.naukrinearby.service.AccountService;
 import com.naukrinearby.service.CandidateProfileService;
+import com.naukrinearby.service.ConsentService;
 import com.naukrinearby.service.DashboardService;
 import com.naukrinearby.service.NotificationPreferenceService;
 import com.naukrinearby.service.SavedJobService;
+import com.naukrinearby.service.SkillGapService;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -41,6 +50,8 @@ public class CandidateController {
 	private final DashboardService dashboardService;
 	private final AccountService accountService;
 	private final SavedJobService savedJobService;
+	private final ConsentService consentService;
+	private final SkillGapService skillGapService;
 
 	@GetMapping("/profile")
 	public CandidateProfileResponse profile(@AuthenticationPrincipal AuthPrincipal principal) {
@@ -67,6 +78,32 @@ public class CandidateController {
 	@ResponseStatus(HttpStatus.NO_CONTENT)
 	public void deleteAccount(@AuthenticationPrincipal AuthPrincipal principal) {
 		accountService.deleteAccount(principal.id());
+	}
+
+	/** DPDP right to access: everything we hold about the candidate, as a downloadable JSON file. */
+	@GetMapping("/account/export")
+	public ResponseEntity<Map<String, Object>> exportAccount(@AuthenticationPrincipal AuthPrincipal principal) {
+		return ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"naukrinearby-my-data.json\"")
+				.contentType(MediaType.APPLICATION_JSON)
+				.body(accountService.export(principal.id()));
+	}
+
+	@GetMapping("/consents")
+	public List<ConsentDto.Response> consents(@AuthenticationPrincipal AuthPrincipal principal) {
+		return consentService.current(principal.id());
+	}
+
+	@PutMapping("/consents")
+	public ConsentDto.Response updateConsent(@Valid @RequestBody ConsentDto.UpdateRequest req,
+			@AuthenticationPrincipal AuthPrincipal principal) {
+		return consentService.record(principal.id(), req.purpose(), req.granted(), ConsentService.WEB_NOTICE_VERSION);
+	}
+
+	/** Which of the job's skills the candidate has, which are missing, and where to learn them. */
+	@GetMapping("/jobs/{jobId}/skill-gap")
+	public SkillGapResponse skillGap(@PathVariable Long jobId, @AuthenticationPrincipal AuthPrincipal principal) {
+		return skillGapService.forCandidate(principal.id(), jobId);
 	}
 
 	@GetMapping("/notification-preferences")

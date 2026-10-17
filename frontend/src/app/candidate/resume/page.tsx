@@ -8,11 +8,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAuth } from "@/lib/auth";
 import { useResumeUpload } from "@/hooks/useResumeUpload";
 import { cn } from "@/lib/utils";
+import { useT } from "@/i18n/I18nProvider";
 
 export default function ResumeUploadPage() {
   const { isAuthenticated, role, loading } = useAuth();
   const router = useRouter();
   const { state, upload } = useResumeUpload();
+  const t = useT();
 
   useEffect(() => {
     if (!loading && (!isAuthenticated || role !== "CANDIDATE")) {
@@ -61,6 +63,7 @@ export default function ResumeUploadPage() {
         </span>
         <span className="mt-1 text-xs text-muted-foreground">Max ~10 MB</span>
       </label>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">{t.candidate.uploadNotice}</p>
 
       {errorMessage && (
         <div className="mt-4 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">

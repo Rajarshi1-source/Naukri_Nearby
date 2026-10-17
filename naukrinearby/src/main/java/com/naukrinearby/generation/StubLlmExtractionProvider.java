@@ -22,9 +22,12 @@ import org.springframework.stereotype.Component;
 public class StubLlmExtractionProvider implements LlmExtractionProvider {
 
 	private static final Pattern PHONE = Pattern.compile("(?<!\\d)(?:\\+?91[-\\s]?|0)?([6-9]\\d{9})(?!\\d)");
-	private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w-]+\\.[\\w.-]+");
-	private static final Pattern YEARS = Pattern.compile("(\\d+(?:\\.\\d+)?)\\s*(saal|years?|yr)");
-	private static final Pattern MONTHS = Pattern.compile("(\\d+)\\s*(mahine|months?)");
+	// Bounded quantifiers keep these linear on hostile input (CodeQL java/polynomial-redos).
+	private static final Pattern EMAIL = Pattern.compile("[\\w.+-]{1,64}@[\\w-]{1,63}(?:\\.[\\w-]{1,63}){1,4}");
+	private static final Pattern YEARS = Pattern.compile("(\\d{1,2}(?:\\.\\d{1,2})?)\\s{0,3}(saal|years?|yr)");
+	private static final Pattern MONTHS = Pattern.compile("(\\d{1,3})\\s{0,3}(mahine|months?)");
+	/** Resume text is capped before the heuristics run; real resumes are far shorter. */
+	static final int MAX_RESUME_CHARS = 50_000;
 
 	/**
 	 * The prompt template ends with this exact line immediately before the injected resume text.
@@ -117,7 +120,8 @@ public class StubLlmExtractionProvider implements LlmExtractionProvider {
 	/** Returns only the resume portion of a rendered prompt (everything after the final marker line). */
 	private static String resumeSection(String prompt) {
 		int idx = prompt.lastIndexOf(RESUME_MARKER);
-		return idx < 0 ? prompt : prompt.substring(idx + RESUME_MARKER.length());
+		String resume = idx < 0 ? prompt : prompt.substring(idx + RESUME_MARKER.length());
+		return resume.length() > MAX_RESUME_CHARS ? resume.substring(0, MAX_RESUME_CHARS) : resume;
 	}
 
 	/** Returns the canonical name of the first known city mentioned in the resume, or null. */

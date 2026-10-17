@@ -2,6 +2,7 @@ package com.naukrinearby.service;
 
 import java.time.Duration;
 
+import com.naukrinearby.config.AdminProperties;
 import com.naukrinearby.config.OtpProperties;
 import com.naukrinearby.exception.RateLimitException;
 import com.naukrinearby.exception.ValidationException;
@@ -10,6 +11,7 @@ import com.naukrinearby.model.dto.auth.VerifyOtpRequest;
 import com.naukrinearby.model.entity.Employer;
 import com.naukrinearby.model.entity.NotificationPreference;
 import com.naukrinearby.model.entity.User;
+import com.naukrinearby.model.enums.Language;
 import com.naukrinearby.model.enums.UserRole;
 import com.naukrinearby.repository.EmployerRepository;
 import com.naukrinearby.repository.NotificationPreferenceRepository;
@@ -34,6 +36,7 @@ public class AuthService {
 	private final EmployerRepository employerRepo;
 	private final NotificationPreferenceRepository prefRepo;
 	private final JwtService jwtService;
+	private final AdminProperties adminProps;
 
 	public void sendOtp(String rawPhone) {
 		String phone = PhoneNumberValidator.normalize(rawPhone);
@@ -50,9 +53,18 @@ public class AuthService {
 			throw new ValidationException("Invalid or expired OTP");
 		}
 		User user = userRepo.findByPhone(phone)
-				.orElseGet(() -> createUser(phone, req.roleOrDefault()));
+				.orElseGet(() -> createUser(phone, isAdminPhone(phone) ? UserRole.ADMIN : req.roleOrDefault()));
+		boolean changed = false;
 		if (!user.isVerified()) {
 			user.setVerified(true);
+			changed = true;
+		}
+		// Admin bootstrap: the only way to get ROLE_ADMIN is to be listed in naukri.admin.phones.
+		if (isAdminPhone(phone) && user.getRole() != UserRole.ADMIN) {
+			user.setRole(UserRole.ADMIN);
+			changed = true;
+		}
+		if (changed) {
 			userRepo.save(user);
 		}
 		String access = jwtService.issueAccessToken(user);
@@ -77,6 +89,13 @@ public class AuthService {
 		}
 	}
 
+	@Transactional
+	public void updateLanguage(Long userId, String language) {
+		User user = requireUser(userId);
+		user.setPreferredLanguage(Language.fromCode(language).getCode());
+		userRepo.save(user);
+	}
+
 	public User requireUser(Long id) {
 		return userRepo.findById(id).orElseThrow(() -> new ValidationException("Unknown user"));
 	}
@@ -91,6 +110,20 @@ public class AuthService {
 			userRepo.save(user);
 		}
 		return user;
+	}
+
+	private boolean isAdminPhone(String normalizedPhone) {
+		for (String candidate : adminProps.phones()) {
+			try {
+				if (PhoneNumberValidator.normalize(candidate).equals(normalizedPhone)) {
+					return true;
+				}
+			}
+			catch (RuntimeException ignored) {
+				// A malformed entry in NAUKRI_ADMIN_PHONES never grants admin.
+			}
+		}
+		return false;
 	}
 
 	private User createUser(String phone, UserRole role) {

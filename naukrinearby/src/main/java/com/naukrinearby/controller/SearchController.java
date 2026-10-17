@@ -6,6 +6,7 @@ import com.naukrinearby.model.dto.job.JobResponse;
 import com.naukrinearby.model.dto.search.JobMatch;
 import com.naukrinearby.model.dto.search.SearchQuery;
 import com.naukrinearby.model.dto.search.SearchResponse;
+import com.naukrinearby.model.entity.Job;
 import com.naukrinearby.security.AuthPrincipal;
 import com.naukrinearby.service.JobService;
 import com.naukrinearby.service.MatchingService;
@@ -50,10 +51,18 @@ public class SearchController {
 		return matchingService.recommendedJobs(principal.id());
 	}
 
-	/** Public job detail — read from Postgres (the source of truth). */
+	/**
+	 * Public job detail — read from Postgres (the source of truth). A job under review is visible only
+	 * to its employer and admins, who also get the moderation outcome and risk reasons (ADR 0007).
+	 */
 	@GetMapping("/api/jobs/{slug}")
-	public JobResponse detail(@PathVariable String slug) {
-		return JobResponse.from(jobService.getBySlug(slug));
+	public JobResponse detail(@PathVariable String slug, @AuthenticationPrincipal AuthPrincipal principal) {
+		Long viewerId = principal == null ? null : principal.id();
+		boolean admin = principal != null && "ADMIN".equals(principal.role());
+		Job job = jobService.getForViewer(slug, viewerId, admin);
+		boolean owner = viewerId != null && job.getEmployer() != null
+				&& viewerId.equals(job.getEmployer().getUserId());
+		return admin || owner ? JobResponse.forOwner(job) : JobResponse.from(job);
 	}
 
 	/** Personalized recommendations for the signed-in candidate (pgvector + PostGIS). */

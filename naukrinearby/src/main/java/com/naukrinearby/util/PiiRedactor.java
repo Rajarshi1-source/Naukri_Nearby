@@ -9,8 +9,9 @@ import java.util.regex.Pattern;
  */
 public final class PiiRedactor {
 
-	private static final Pattern PHONE = Pattern.compile("(\\+?\\d[\\d\\-\\s]{7,}\\d)");
-	private static final Pattern EMAIL = Pattern.compile("([A-Za-z0-9._%+-]+)@([A-Za-z0-9.-]+)");
+	// Bounded quantifiers keep these linear on long free text (CodeQL java/polynomial-redos).
+	private static final Pattern PHONE = Pattern.compile("(\\+?\\d[\\d\\-\\s]{7,16}\\d)");
+	private static final Pattern EMAIL = Pattern.compile("([A-Za-z0-9._%+-]{1,64})@([A-Za-z0-9.-]{1,255})");
 
 	private PiiRedactor() {
 	}

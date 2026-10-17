@@ -15,6 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import VoiceSearchButton from "@/components/VoiceSearchButton";
+import { fmt } from "@/i18n";
+import { useT } from "@/i18n/I18nProvider";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useJobSearch } from "@/hooks/useJobSearch";
 import { titleCase } from "@/lib/format";
@@ -49,6 +52,7 @@ export default function SearchClient({
   initialRadius,
 }: Props) {
   const { coords, located } = useGeolocation();
+  const t = useT();
 
   const [q, setQ] = useState(initialQuery);
   const [category, setCategory] = useState(initialCategory || ALL);
@@ -92,18 +96,28 @@ export default function SearchClient({
           commit();
         }}
         className="mt-4 grid gap-3 rounded-xl border bg-card p-4 sm:grid-cols-[1fr_auto_auto]"
+        role="search"
       >
-        <Input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search title, skill (e.g. delivery, electrician)"
-        />
+        <div className="flex items-center gap-2">
+          <Input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder={t.search.placeholder}
+            aria-label={t.search.title}
+          />
+          <VoiceSearchButton
+            onTranscript={(text) => {
+              setQ(text);
+              commit({ q: text });
+            }}
+          />
+        </div>
         <Select value={category} onValueChange={setCategory}>
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="All categories" />
+            <SelectValue placeholder={t.search.allCategories} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={ALL}>All categories</SelectItem>
+            <SelectItem value={ALL}>{t.search.allCategories}</SelectItem>
             {JOB_CATEGORIES.map((c) => (
               <SelectItem key={c} value={c}>
                 {titleCase(c)}
@@ -111,10 +125,10 @@ export default function SearchClient({
             ))}
           </SelectContent>
         </Select>
-        <Button type="submit">Search</Button>
+        <Button type="submit">{t.search.submit}</Button>
         <div className="sm:col-span-3">
           <Label className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="whitespace-nowrap">Radius: {radius} km</span>
+            <span className="whitespace-nowrap">{fmt(t.search.radius, { n: radius })}</span>
             <Slider
               min={1}
               max={50}
@@ -129,29 +143,27 @@ export default function SearchClient({
       </form>
 
       {!located && (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
-          Location not shared — showing results without distance. Allow location
-          for hyperlocal ranking.
+        <p className="mt-3 rounded-md bg-warning/15 px-3 py-2 text-sm text-foreground">
+          {t.search.noLocation}
         </p>
       )}
       {data?.fellBackToPostgis && (
-        <p className="mt-3 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-700">
-          Showing nearby results (search degraded — full-text temporarily
-          unavailable).
+        <p className="mt-3 rounded-md bg-warning/15 px-3 py-2 text-sm text-foreground">
+          {t.search.degraded}
         </p>
       )}
       {isError && (
         <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error instanceof Error ? error.message : "Search failed"}
+          {error instanceof Error ? error.message : t.search.failed}
         </p>
       )}
 
       <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_minmax(280px,420px)]">
         <div className="space-y-3">
-          {isFetching && <p className="text-muted-foreground">Searching…</p>}
+          {isFetching && <p className="text-muted-foreground">{t.search.searching}</p>}
           {!isFetching && data && data.results.length === 0 && (
             <p className="rounded-xl border border-dashed p-8 text-center text-muted-foreground">
-              No jobs found. Try a wider radius or a different category.
+              {t.search.noResults}
             </p>
           )}
           {data?.results.map((item) => (

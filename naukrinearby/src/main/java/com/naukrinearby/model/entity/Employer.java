@@ -46,6 +46,13 @@ public class Employer {
 	@Column(columnDefinition = "geography(Point,4326)")
 	private Point location;
 
+	/** Set when {@code gstNumber} passes the configured {@code GstVerifier} (ADR 0007). */
+	@Column(name = "gst_verified", nullable = false)
+	private boolean gstVerified = false;
+
+	@Column(name = "verified_at")
+	private Instant verifiedAt;
+
 	@CreationTimestamp
 	@Column(name = "created_at", updatable = false)
 	private Instant createdAt;
