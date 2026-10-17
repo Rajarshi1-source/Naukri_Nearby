@@ -17,6 +17,10 @@ repositories {
 	mavenCentral()
 }
 
+// Mockito's inline mock maker must be loaded as a -javaagent on Java 21+: dynamic self-attach is
+// deprecated (JEP 451) and fails outright in some containers ("Could not self-attach to current VM").
+val mockitoAgent = configurations.create("mockitoAgent")
+
 dependencies {
 	implementation("org.springframework.boot:spring-boot-micrometer-tracing-brave")
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -68,8 +72,10 @@ dependencies {
 	testCompileOnly("org.projectlombok:lombok")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testAnnotationProcessor("org.projectlombok:lombok")
+	mockitoAgent("org.mockito:mockito-core") { isTransitive = false }
 }
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+	jvmArgumentProviders.add(CommandLineArgumentProvider { listOf("-javaagent:${mockitoAgent.asPath}") })
 }
