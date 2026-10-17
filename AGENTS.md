@@ -49,5 +49,17 @@ even when the skill is not auto-triggered. The skills remain the authoritative s
 - Idempotency: WhatsApp dedup on `(user_id, job_id)`; ES upsert on `job_id`.
 - Graceful degradation: ES down -> PostGIS `ST_DWithin` fallback; translation down -> send English.
 
+## Bharat differentiators (ADRs 0007–0009)
+- Fraud scoring is rule-based, synchronous, and offline (`JobRiskScorer`); moderation status rides
+  the outbox, and the sync worker removes non-`APPROVED` jobs from ES. Public reads show only
+  `ACTIVE` + `APPROVED` jobs. Candidates never see numeric risk scores.
+- ADMIN comes only from `NAUKRI_ADMIN_PHONES`; `/api/admin/**` is `ROLE_ADMIN`.
+- Every Twilio webhook (status, inbound WhatsApp, voice/IVR) verifies `X-Twilio-Signature` first and
+  replies via the escaping `TwiML` helper. Regexes on user input use bounded quantifiers.
+- `LlmTracer` and logs never carry resume text or phone numbers.
+- Frontend i18n uses typed dictionaries (`src/i18n`); the service worker is hand-written and never
+  caches authenticated requests.
+
 ## Testing
 - Integration tests use Testcontainers (`@ServiceConnection`) + `RestTestClient`.
+- Frontend E2E tests use Playwright against the real stack (`frontend/e2e`).
