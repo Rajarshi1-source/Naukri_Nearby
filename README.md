@@ -7,7 +7,19 @@ The repository has two apps:
 | Path | What it is |
 | --- | --- |
 | [`naukrinearby/`](naukrinearby/) | Spring Boot 4 API, workers, Flyway migrations, eval harness, Compose, monitoring, Kubernetes manifests |
-| [`frontend/`](frontend/) | Next.js 16 web app (search, job pages, login, resume upload, apply, save) |
+| [`frontend/`](frontend/) | Next.js 16 web app (search, job pages, dashboards, offline PWA, English/हिंदी) |
+
+## Screenshots
+
+| Hinglish search ("bijli mistri ka kaam" finds Electrician) | Job page: trust badge, skill gap, report |
+| --- | --- |
+| ![Search](docs/screenshots/search-hinglish.png) | ![Job detail](docs/screenshots/job-detail-skill-gap.png) |
+| **Employer: a scam posting held for review, with reasons** | **Admin moderation queue** |
+| ![Employer dashboard](docs/screenshots/employer-under-review.png) | ![Moderation queue](docs/screenshots/admin-moderation.png) |
+
+<p align="center"><img src="docs/screenshots/home-hindi-mobile.png" alt="Home page in Hindi on a phone" width="300"></p>
+
+Screenshots are captured from the running stack with `frontend/scripts/screenshots.mjs`.
 
 ## Features
 
@@ -21,6 +33,18 @@ The repository has two apps:
 - WhatsApp status webhooks (Twilio signature check) and a WhatsApp-first apply conversation path.
 - Right-to-erasure: `DELETE /api/candidate/account` removes the user graph and the stored resume object.
 - Internal eval endpoints (off unless `EVAL_ENABLED=true`) that exercise the production parse, match, and translate paths.
+
+### Bharat differentiators
+
+- **Voice-first apply (IVR).** Call the number, press 1, key in the job number, confirm. Prompts in Hindi and English, keypad or speech, same idempotent apply path as the web ([ADR 0008](docs/adr/0008-voice-ivr-apply.md)).
+- **WhatsApp-first apply.** Build a profile and apply by chatting, no app or resume needed.
+- **Vernacular UI.** English / हिंदी switcher, saved to the account so alerts and the IVR follow it. Search understands Hinglish and Devanagari ("gaadi chalana", "बिजली मिस्त्री"), and voice search uses the browser's speech recognition.
+- **Offline-first PWA.** Installable; job pages and searches you have seen work offline, and an application made offline is sent when the connection returns ([ADR 0009](docs/adr/0009-vernacular-ux-and-offline-pwa.md)).
+- **Fake-job protection.** Every posting gets an explainable risk score (fee requests in three scripts, unrealistic pay, off-platform contact, new or unverified employer). Risky jobs wait in an admin queue; enough user reports send a live job back to review ([ADR 0007](docs/adr/0007-trust-and-moderation.md)).
+- **Trust signals.** Employers are "Phone verified" by OTP and "Verified business" with a valid GSTIN (offline check-digit verification). Candidates see the badge and how long the employer has been on the platform, never a raw score.
+- **Skill-gap suggestions.** On a job page, a candidate sees which required skills they lack, with links to free official portals (SWAYAM, Skill India Digital Hub, NCS, Parivahan Sarathi).
+- **DPDP controls.** A consent ledger (resume processing, WhatsApp alerts), one-click download of all personal data, and account deletion that erases the resume file.
+- **Platform.** Resume parsing is bulkheaded with Spring Framework 7 `@ConcurrencyLimit`; LLM calls can be traced to Langfuse with metadata only.
 
 External providers ship as stubs so the app runs with no API keys. Real LLM, embedding, translation, OTP, WhatsApp, vision, and geocoding adapters are selected by environment variables.
 
@@ -128,7 +152,7 @@ npm install
 npm run dev
 ```
 
-Dev login uses the stub OTP provider: any new phone number, code `123456`, role `CANDIDATE` or `EMPLOYER`.
+Dev login uses the stub OTP provider: any new phone number, code `123456`, role `CANDIDATE` or `EMPLOYER`. To use the moderation queue, start the API with `NAUKRI_ADMIN_PHONES=<your test phone>` and log in with that number.
 
 Useful backend tasks:
 
@@ -189,12 +213,13 @@ Operational steps for outbox lag, notification DLQ replay, zero-downtime index a
 
 ## CI/CD
 
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main` and on pull requests:
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on pushes to `main` and on pull requests, with read-only `contents` permission:
 
 | Job | What it does |
 | --- | --- |
 | `build-and-test` | `./gradlew build` in `naukrinearby/`. Testcontainers uses the runner’s Docker daemon (Postgres image built from `docker/postgres`, Elasticsearch 9.4.5, Redis, RustFS). |
 | `test-frontend` | Node 24, `npm ci`, `npm run lint`, `npm run build`. |
+| `e2e` | Compose infra + the backend jar + a production `next start`, then Playwright (`frontend/e2e`): OTP login, apply, consent, Hinglish search, language switch, scam posting through admin approval, offline apply replay, PWA manifest. |
 | `resume-eval-gate` | After the backend build: Compose infra, boot the jar with `EVAL_ENABLED=true` and `EXTRACTION_PROVIDER=stub`, then `python run_eval.py --ci`. |
 
 There is no deploy job in that workflow. Kubernetes manifests for an API tier (`api` profile, workers off) and a worker tier are in [`naukrinearby/k8s/`](naukrinearby/k8s/). Copy `config-and-secrets.example.yaml` and supply real secrets out of band.
@@ -211,7 +236,13 @@ There is no deploy job in that workflow. Kubernetes manifests for an API tier (`
 - **Search index name.** Code uses the alias `jobs`, not `jobs_v1`. Mapping changes go through a reindex and an atomic alias flip ([ADR 0003](docs/adr/0003-alias-flip-reindex.md)).
 - **Resumes are personal data.** Objects can be stored with SSE-S3 (`STORAGE_ENCRYPTION=sse`), access is via signed URLs, and account deletion removes the object. Do not log resume text or phone numbers in the clear.
 - **Rate limits.** OTP is capped per hour; general API traffic is a fixed window in Redis (default 100 requests/minute per user, or per IP when anonymous).
-- **Frontend route gate.** `frontend/src/proxy.ts` only checks that an `nn_session` cookie exists before `/candidate` and `/employer`. Authorization is enforced on the API.
+- **Frontend route gate.** `frontend/src/proxy.ts` only checks that an `nn_session` cookie exists before `/candidate`, `/employer` and `/admin`. Authorization is enforced on the API.
+- **Moderation gates the index, not the write.** Every job is stored; its `moderation_status` travels in the outbox payload and the sync worker deletes non-approved jobs from Elasticsearch. Public reads, apply, recommendations and the PostGIS fallback only see `ACTIVE` + `APPROVED` jobs. Fraud scoring is rule-based, synchronous and offline (ADR 0007).
+- **Admins come from configuration.** `NAUKRI_ADMIN_PHONES` lists the phones that get `ROLE_ADMIN` at OTP login. There is no admin sign-up. (This replaces the earlier situation where no flow issued ADMIN tokens.)
+- **Every Twilio webhook is signature-verified**, including the voice (IVR) routes, and replies are built by one escaping TwiML helper with an explicit UTF-8 content type.
+- **Consent is a ledger.** `consents` rows are append-only; withdrawing WhatsApp-alert consent stops alerts at the worker. `notification_logs` now cascades on user/job deletion, so erasure always succeeds.
+- **CSRF stays off on purpose.** Auth is a Bearer header and no cookie authenticates a request (`nn_session` is a UI hint). If auth ever moves to cookies, CSRF must be enabled.
+- **i18n without a framework.** Typed dictionaries in `frontend/src/i18n`; a missing Hindi key fails the build. The service worker is hand-written and never caches authenticated requests.
 - **Compose does not run the API.** `docker compose up -d` is infra. `bootRun` (or a jar) is a separate process. The frontend container calls the API at `NEXT_PUBLIC_API_URL`, which must be reachable from the browser, not only from inside the container.
 - **Workers.** `@Profile("!api")` on the outbox and notification loops. An all-in-one `bootRun` (no `api` profile) runs them in-process, which is what local dev wants.
 
@@ -226,11 +257,16 @@ There is no deploy job in that workflow. Kubernetes manifests for an API tier (`
 | [`docs/adr/0002-model-adapter-pattern.md`](docs/adr/0002-model-adapter-pattern.md) | Stub vs live providers |
 | [`docs/adr/0003-alias-flip-reindex.md`](docs/adr/0003-alias-flip-reindex.md) | Zero-downtime reindex |
 | [`docs/adr/0004-expand-contract-migrations.md`](docs/adr/0004-expand-contract-migrations.md) | Flyway change policy |
-| [`docs/runbooks/operations.md`](docs/runbooks/operations.md) | Outbox, DLQ, reindex, erasure |
+| [`docs/adr/0007-trust-and-moderation.md`](docs/adr/0007-trust-and-moderation.md) | Fraud scoring, moderation, trust levels |
+| [`docs/adr/0008-voice-ivr-apply.md`](docs/adr/0008-voice-ivr-apply.md) | Voice-first (IVR) apply |
+| [`docs/adr/0009-vernacular-ux-and-offline-pwa.md`](docs/adr/0009-vernacular-ux-and-offline-pwa.md) | Hindi UI, voice search, offline PWA |
+| [`docs/plans/differentiators-implementation-plan.md`](docs/plans/differentiators-implementation-plan.md) | Scope and decisions for the differentiator milestone |
+| [`SCALING.md`](SCALING.md) | How the design scales to millions of users |
+| [`docs/runbooks/operations.md`](docs/runbooks/operations.md) | Outbox, DLQ, reindex, erasure, consent, moderation, IVR setup |
 | [`AGENTS.md`](AGENTS.md) | Repository rules for implementation work |
 | [`naukrinearby/.env.example`](naukrinearby/.env.example) | Every backend environment variable |
 
-[`naukrinearby/docs/future-work/README.md`](naukrinearby/docs/future-work/README.md) lists items that were deferred from an earlier milestone. Several of those (frontend, Grafana, Kubernetes manifests, Resilience4j) now exist in this tree; treat that file as a backlog note, not as the current architecture.
+[`naukrinearby/docs/future-work/README.md`](naukrinearby/docs/future-work/README.md) lists items that were deferred from an earlier milestone. Almost all of them now exist in this tree; the file's header lists what is still open.
 
 ## License
 

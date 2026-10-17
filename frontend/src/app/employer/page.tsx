@@ -125,7 +125,7 @@ function ProfileCard() {
           </Field>
           <Field id={ids.gst} label={t.employer.gstin} hint={t.employer.gstinHint}>
             <Input id={ids.gst} maxLength={15} value={current.gstNumber} className="uppercase"
-              placeholder="27AAPFU0939F1ZV"
+              placeholder="15-character GSTIN"
               onChange={(e) => setDraft({ ...current, gstNumber: e.target.value })} />
           </Field>
           <div className="grid grid-cols-2 gap-3">

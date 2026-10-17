@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import VoiceSearchButton from "@/components/VoiceSearchButton";
 import { fmt } from "@/i18n";
 import { useT } from "@/i18n/I18nProvider";
+import { ApiError } from "@/lib/api";
 import { useGeolocation } from "@/hooks/useGeolocation";
 import { useJobSearch } from "@/hooks/useJobSearch";
 import { titleCase } from "@/lib/format";
@@ -154,7 +155,7 @@ export default function SearchClient({
       )}
       {isError && (
         <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
-          {error instanceof Error ? error.message : t.search.failed}
+          {error instanceof ApiError ? error.message : t.search.failed}
         </p>
       )}
 

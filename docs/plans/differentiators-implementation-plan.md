@@ -88,10 +88,10 @@ Schema changes follow ADR 0004 (expand-only in this milestone): `V5__trust_and_m
 | `EmployerController` `GET/PUT /api/employer/profile` (company, GSTIN → verification) | `controller/` |
 | Trust fields on `JobResponse` / search items (`trustLevel`, `employerSince`) | DTOs |
 | `QueryNormalizer` + lexicon; wire into `SearchService` | `service/search/` |
-| `SkillGapService` + `GET /api/candidate/jobs/{id}/skill-gap` | `service/`, `resources/trust/learning-portals.yml` |
+| `SkillGapService` + `GET /api/candidate/jobs/{id}/skill-gap` | `service/`, `resources/trust/learning-portals.tsv` |
 | `ConsentService`, `GET/PUT /api/candidate/consents`, `GET /api/candidate/account/export` | `service/`, `controller/` |
 | `PUT /api/auth/me/language` | `AuthController` |
-| `IvrService` + `IvrController` (`/voice`, `/voice/gather`) | `service/`, `controller/` |
+| `IvrService` + `IvrController` (`/voice`, `/voice/gather/{step}`) | `service/`, `controller/` |
 | `@EnableResilientMethods` + `@ConcurrencyLimit` on the parse path | `config/`, `ResumeParserService` |
 | `LlmTracer` port, `LogLlmTracer`, `LangfuseLlmTracer`, `NoopLlmTracer` | `generation/` |
 | Admin phone bootstrap in `AuthService` | `service/` |

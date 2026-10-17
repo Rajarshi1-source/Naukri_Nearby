@@ -74,8 +74,8 @@ is what `compose.yaml` and `k8s/` describe today.
   `noeviction` for queues and tokens). Losing the cache must never drop a queued alert.
 - **Worker tiers by job type**: `sync` (outbox → ES), `notify` (alerts), `parse` (resume/LLM).
   Each scales on its own metric: outbox lag, `notification_queue_depth`, parse queue depth. Redis
-  Streams consumer names come from the pod name (`HOSTNAME`), not a fixed `worker-1`, so pending
-  entries are claimable (`XAUTOCLAIM`) when a pod dies.
+  Streams consumer names already come from the pod name (`consumer-name: ${HOSTNAME:worker-1}`);
+  add an `XAUTOCLAIM` sweeper so a dead pod's pending entries are picked up by the survivors.
 - **Outbox → CDC**: replace polling with Debezium tailing the WAL into Kafka (or Redis Streams)
   when outbox volume exceeds ~1k events/s. The outbox table stays as the contract, so the change
   is invisible to the write path.
@@ -197,7 +197,7 @@ replay or a full reindex into a new `jobs_vN` and an alias flip).
 ## 12. What would change first under real load
 
 1. PgBouncer + read replica routing (cheapest, biggest win).
-2. Pod-name Redis Stream consumers + `XAUTOCLAIM` sweeper.
+2. `XAUTOCLAIM` sweeper for the Redis Stream consumers (consumer names are already per pod).
 3. Redis split by role.
 4. Geohash cache keys + request coalescing.
 5. Outbox partitioning, then CDC.

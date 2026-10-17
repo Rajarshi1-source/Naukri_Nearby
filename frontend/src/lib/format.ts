@@ -1,10 +1,18 @@
+const PERIOD: Record<string, string> = {
+  MONTHLY: "month",
+  DAILY: "day",
+  WEEKLY: "week",
+  HOURLY: "hour",
+  YEARLY: "year",
+};
+
 export function formatSalary(
   min: number | null | undefined,
   max: number | null | undefined,
   type?: string | null,
 ): string {
   if (!min && !max) return "Salary not disclosed";
-  const suffix = type ? `/${type.toLowerCase()}` : "";
+  const suffix = type ? `/${PERIOD[type.toUpperCase()] ?? type.toLowerCase()}` : "";
   const fmt = (n: number) => `₹${n.toLocaleString("en-IN")}`;
   if (min && max) return `${fmt(min)} – ${fmt(max)}${suffix}`;
   return `${fmt((min ?? max) as number)}${suffix}`;

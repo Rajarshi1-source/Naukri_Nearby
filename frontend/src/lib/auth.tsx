@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { api, tokens } from "@/lib/api";
+import { api, ApiError, tokens } from "@/lib/api";
 import { MeResponseSchema, type AuthResponse, type MeResponse } from "@/types";
 
 interface AuthState {
@@ -24,6 +24,26 @@ interface AuthState {
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
+
+const ME_KEY = "nn_me";
+
+function cacheMe(me: MeResponse | null) {
+  try {
+    if (me) window.localStorage.setItem(ME_KEY, JSON.stringify(me));
+    else window.localStorage.removeItem(ME_KEY);
+  } catch {
+    // storage unavailable (private mode): offline sign-in simply isn't kept
+  }
+}
+
+function readCachedMe(): MeResponse | null {
+  try {
+    const raw = window.localStorage.getItem(ME_KEY);
+    return raw ? MeResponseSchema.parse(JSON.parse(raw)) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<MeResponse | null>(null);
@@ -40,8 +60,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const me = MeResponseSchema.parse(await api<unknown>("/api/auth/me"));
       setUser(me);
       setRole(me.role);
-    } catch {
+      cacheMe(me);
+    } catch (err) {
+      // Offline (ADR 0009): a network failure is not a bad session. Keep the user signed in from the
+      // last known profile so queued applies still work; only an HTTP error ends the session.
+      const cached = !(err instanceof ApiError) ? readCachedMe() : null;
+      if (cached) {
+        setUser(cached);
+        setRole(cached.role);
+        return;
+      }
       tokens.clear();
+      cacheMe(null);
       setUser(null);
       setRole(null);
     }
@@ -75,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // best-effort; clear local state regardless
     }
     tokens.clear();
+    cacheMe(null);
     setUser(null);
     setRole(null);
   }, []);

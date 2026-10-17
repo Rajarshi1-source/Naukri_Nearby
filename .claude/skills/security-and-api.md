@@ -184,7 +184,7 @@ The webhook path is `permitAll()` in the filter chain (Twilio has no JWT) — th
 
 The same rule covers **every** Twilio webhook: `/api/webhooks/twilio` (status),
 `/api/webhooks/twilio/inbound` (WhatsApp chat), and the voice/IVR pair
-`/api/webhooks/twilio/voice` + `/api/webhooks/twilio/voice/gather` (ADR 0008). Verify first, then
+`/api/webhooks/twilio/voice` + `/api/webhooks/twilio/voice/gather/{step}` (ADR 0008). Verify first, then
 act. TwiML replies are built with `util.TwiML`, which escapes every user-derived string with
 `HtmlUtils.htmlEscape(text, "UTF-8")` — never concatenate raw `Body`/`SpeechResult` text into XML.
 IVR state is keyed by `CallSid` in Redis (TTL 15 min); caller numbers are redacted in logs.
@@ -315,7 +315,7 @@ DIFFERENTIATORS (ADRs 0007–0009)
   GET    /api/admin/moderation/jobs?status=PENDING_REVIEW             → 200 PageResponse<ModerationItem>
   POST   /api/admin/moderation/jobs/{id}/decision { decision, note? }  → 200  (APPROVED | REJECTED)
   POST   /api/webhooks/twilio/voice    (Twilio-signed)                → 200 TwiML / 403
-  POST   /api/webhooks/twilio/voice/gather?step=… (Twilio-signed)     → 200 TwiML / 403
+  POST   /api/webhooks/twilio/voice/gather/{menu|job|confirm} (Twilio-signed) → 200 TwiML / 403
 ```
 
 Visibility rule (ADR 0007): public reads (`/api/jobs/search`, `/api/jobs/{slug}`, recommendations)

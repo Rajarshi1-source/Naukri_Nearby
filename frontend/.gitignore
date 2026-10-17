@@ -6,3 +6,9 @@
 .env*.local
 *.tsbuildinfo
 next-env.d.ts.timestamp
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

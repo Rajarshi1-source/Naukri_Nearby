@@ -62,6 +62,7 @@ export const tokens = {
       window.localStorage.removeItem(ACCESS_KEY);
       window.localStorage.removeItem(REFRESH_KEY);
       window.localStorage.removeItem(ROLE_KEY);
+      window.localStorage.removeItem("nn_me"); // offline profile cache (lib/auth.tsx)
     }
     clearSessionCookie();
   },
