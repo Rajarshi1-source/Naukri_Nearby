@@ -150,6 +150,14 @@ public class JobService {
 				.orElseThrow(() -> new NotFoundException("Job not found: " + jobId));
 	}
 
+	/** An open, approved job by slug — what anonymous readers may listen to (ADR 0009). */
+	@Transactional(readOnly = true)
+	public Job getPublicJob(String slug) {
+		return jobRepo.findBySlug(slug)
+				.filter(Job::isPubliclyVisible)
+				.orElseThrow(() -> new NotFoundException("Job not found: " + slug));
+	}
+
 	@Transactional(readOnly = true)
 	public Page<Job> employerJobs(Long userId, Pageable pageable) {
 		Employer employer = employerRepo.findByUserId(userId)

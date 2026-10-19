@@ -210,6 +210,14 @@ export const JobTranslationSchema = z.object({
 });
 export type JobTranslation = z.infer<typeof JobTranslationSchema>;
 
+/** Voice-search transcript from Bhashini ASR; empty `text` = nothing recognised. */
+export const TranscriptionSchema = z.object({
+  text: z.string(),
+  language: z.string(),
+  provider: z.string(),
+});
+export type Transcription = z.infer<typeof TranscriptionSchema>;
+
 export interface ProblemDetail {
   type?: string;
   title?: string;

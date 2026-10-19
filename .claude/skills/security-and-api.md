@@ -306,6 +306,8 @@ DASHBOARD
 DIFFERENTIATORS (ADRs 0007–0009)
   PUT    /api/auth/me/language         { language }                    → 204  (en | hi | ta | te | bn | mr | kn | gu)
   GET    /api/jobs/{slug}/translation?lang=xx                         → 200 JobTranslationResponse (public; 400 bad lang; 404 not public)
+  POST   /api/speech/transcribe        multipart audio (16 kHz mono WAV ≤ 1 MB/30 s) + lang → 200 { text, language, provider } (public; 400; 429 per user/IP; 503)
+  GET    /api/jobs/{slug}/audio?lang=xx                               → 200 audio/wav + Content-Language / 204 no audio (public; 400; 404 not ACTIVE+APPROVED; 429; 503)
   GET    /api/employer/profile                                        → 200 EmployerProfileResponse (incl. trustLevel)
   PUT    /api/employer/profile         EmployerProfileRequest          → 200  (GSTIN → GstVerifier)
   POST   /api/jobs/{id}/report         { reason, details? }             → 201 / 409 (already reported)  (auth)
@@ -318,6 +320,10 @@ DIFFERENTIATORS (ADRs 0007–0009)
   POST   /api/webhooks/twilio/voice    (Twilio-signed)                → 200 TwiML / 403
   POST   /api/webhooks/twilio/voice/gather/{menu|job|confirm} (Twilio-signed) → 200 TwiML / 403
 ```
+
+Speech uploads (ADR 0009): validate the WAV header before any provider call (format, size, duration),
+rate-limit per user or per IP when signed out, and never log or store audio or transcripts — a voice
+clip is personal data under the DPDP Act.
 
 Visibility rule (ADR 0007): public reads (`/api/jobs/search`, `/api/jobs/{slug}`, recommendations)
 return only `ACTIVE` + `APPROVED` jobs. `JobResponse` carries `trustLevel` and `employerSince` for

@@ -128,6 +128,24 @@ naukri:
     timeout: 10s
     config-ttl: 1h
     job-cache-ttl: 7d
+  # Bhashini ASR (voice-search fallback) + TTS (job "Listen" button), ADR 0009. Same ULCA credentials as
+  # translation; BHASHINI_SPEECH_PIPELINE_ID only if speech uses a different pipeline.
+  speech:
+    provider: ${SPEECH_PROVIDER:stub}
+    config-url: ${BHASHINI_CONFIG_URL:https://meity-auth.ulcacontrib.org/ulca/apis/v0/model/getModelsPipeline}
+    user-id: ${BHASHINI_USER_ID:}
+    ulca-api-key: ${BHASHINI_ULCA_API_KEY:}
+    pipeline-id: ${BHASHINI_SPEECH_PIPELINE_ID:${BHASHINI_PIPELINE_ID:}}
+    timeout: 20s
+    config-ttl: 1h
+    tts-gender: female
+    max-audio-bytes: 1048576
+    max-audio-seconds: 30
+    transcribe-per-minute: ${SPEECH_TRANSCRIBE_PER_MINUTE:10}
+    synthesize-per-minute: ${SPEECH_SYNTHESIZE_PER_MINUTE:10}
+    max-spoken-chars: 700
+    audio-cache-ttl: 7d
+    max-cached-audio-bytes: 4194304
   twilio:
     provider: ${TWILIO_PROVIDER:stub}
     account-sid: ${TWILIO_ACCOUNT_SID:}
