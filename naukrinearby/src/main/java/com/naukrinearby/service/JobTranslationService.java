@@ -40,7 +40,12 @@ public class JobTranslationService {
 
 	public JobTranslationResponse translate(String slug, String languageCode) {
 		String target = normalizeLanguage(languageCode);
-		Job job = jobService.getForViewer(slug, null, false);
+		return translate(jobService.getForViewer(slug, null, false), target);
+	}
+
+	/** Translates a job the caller has already checked is public; {@code languageCode} must be supported. */
+	public JobTranslationResponse translate(Job job, String languageCode) {
+		String target = normalizeLanguage(languageCode);
 		String source = DEVANAGARI.matcher(job.getTitle() + " " + nz(job.getDescription())).find() ? "hi" : "en";
 		String description = truncate(job.getDescription());
 		String provider = translationService.providerId();
@@ -90,7 +95,8 @@ public class JobTranslationService {
 		}
 	}
 
-	private static String normalizeLanguage(String code) {
+	/** A supported ISO-639-1 code in lower case, or a {@link ValidationException}. */
+	public static String normalizeLanguage(String code) {
 		if (code == null || code.isBlank()) {
 			throw new ValidationException("lang is required");
 		}

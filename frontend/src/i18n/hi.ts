@@ -54,6 +54,7 @@ export const hi: Dictionary = {
     voiceStop: "सुनना बंद करें",
     listening: "सुन रहे हैं… अब बोलें",
     voiceError: "आवाज़ सुनाई नहीं दी। फिर से बोलें या लिखें।",
+    transcribing: "आपकी बात समझ रहे हैं…",
   },
   job: {
     back: "← खोज पर वापस",
@@ -67,6 +68,10 @@ export const hi: Dictionary = {
     translatedNote: "भाषिणी से मशीन अनुवाद। इसमें गलतियां हो सकती हैं; मूल विवरण ऊपर है।",
     translating: "अनुवाद हो रहा है…",
     translationUnavailable: "अनुवाद अभी उपलब्ध नहीं है।",
+    listen: "सुनें",
+    listenStop: "रोकें",
+    listenLoading: "आवाज़ लोड हो रही है…",
+    listenUnavailable: "इस नौकरी की आवाज़ अभी उपलब्ध नहीं है।",
   },
   apply: {
     apply: "अभी आवेदन करें",

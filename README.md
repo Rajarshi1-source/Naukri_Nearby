@@ -39,7 +39,8 @@ Screenshots are captured from the running stack with `frontend/scripts/screensho
 - **Voice-first apply (IVR).** Call the number, press 1, key in the job number, confirm. Prompts in Hindi and English, keypad or speech, same idempotent apply path as the web ([ADR 0008](docs/adr/0008-voice-ivr-apply.md)).
 - **WhatsApp-first apply.** Build a profile and apply by chatting, no app or resume needed.
 - **Job descriptions in eight Indian languages.** "Read this job in …" on every job page, machine-translated by Bhashini's pipeline API on the server and cached per job version; always labelled, with the original kept visible.
-- **Vernacular UI.** English / हिंदी switcher, saved to the account so alerts and the IVR follow it. Search understands Hinglish and Devanagari ("gaadi chalana", "बिजली मिस्त्री"), and voice search uses the browser's speech recognition.
+- **Listen to a job.** A "Listen" button reads the job aloud in the chosen language, for users who find reading hard. It uses the browser's own voice when there is one for that language, and otherwise Bhashini text-to-speech on the server (translated first, cached per job version and language).
+- **Vernacular UI.** English / हिंदी switcher, saved to the account so alerts and the IVR follow it. Search understands Hinglish and Devanagari ("gaadi chalana", "बिजली मिस्त्री"). Voice search uses the browser's speech recognition; where that is missing (Firefox, many Android WebViews) the app records a short clip, converts it to 16 kHz WAV in the browser, and Bhashini transcribes it on the server.
 - **Offline-first PWA.** Installable; job pages and searches you have seen work offline, and an application made offline is sent when the connection returns ([ADR 0009](docs/adr/0009-vernacular-ux-and-offline-pwa.md)).
 - **Fake-job protection.** Every posting gets an explainable risk score (fee requests in three scripts, unrealistic pay, off-platform contact, new or unverified employer). Risky jobs wait in an admin queue; enough user reports send a live job back to review ([ADR 0007](docs/adr/0007-trust-and-moderation.md)).
 - **Trust signals.** Employers are "Phone verified" by OTP and "Verified business" with a valid GSTIN (offline check-digit verification). Candidates see the badge and how long the employer has been on the platform, never a raw score.
@@ -47,7 +48,7 @@ Screenshots are captured from the running stack with `frontend/scripts/screensho
 - **DPDP controls.** A consent ledger (resume processing, WhatsApp alerts), one-click download of all personal data, and account deletion that erases the resume file.
 - **Platform.** Resume parsing is bulkheaded with Spring Framework 7 `@ConcurrencyLimit`; LLM calls can be traced to Langfuse with metadata only.
 
-External providers ship as stubs so the app runs with no API keys. Real LLM, embedding, translation, OTP, WhatsApp, vision, and geocoding adapters are selected by environment variables.
+External providers ship as stubs so the app runs with no API keys. Real LLM, embedding, translation, speech, OTP, WhatsApp, vision, and geocoding adapters are selected by environment variables.
 
 ## Tech Stack
 
@@ -62,7 +63,7 @@ External providers ship as stubs so the app runs with no API keys. Real LLM, emb
 | Cache and queues | Redis 7 (cache, Streams, rate limits, refresh tokens, idempotency) |
 | Object storage | RustFS 1.0.1 (S3-compatible, Apache-2.0) for resumes, accessed via the MinIO Java SDK. Replaced MinIO, whose images left Docker Hub ([ADR 0006](docs/adr/0006-rustfs-object-storage.md)) |
 | Auth | Phone OTP → JWT (RS256). OTP, WhatsApp, and translation default to stubs |
-| AI | Config-selected adapters: GPT-5-mini-class extraction, local or remote embeddings (1024 dims), Bhashini translation |
+| AI | Config-selected adapters: GPT-5-mini-class extraction, local or remote embeddings (1024 dims), Bhashini translation, speech recognition and text-to-speech |
 | Resilience | Resilience4j retry and circuit breakers on external calls |
 | Observability | Micrometer, Prometheus, Grafana, optional Langfuse |
 | CI | GitHub Actions |
@@ -165,7 +166,7 @@ cd naukrinearby
 
 Frontend: `npm run lint`, `npm run build`, `npm run start`.
 
-To exercise real extraction instead of the stub, set `EXTRACTION_PROVIDER=gpt5mini` and `LLM_API_KEY` in `.env`. Other live adapters (`EMBEDDING_PROVIDER=remote`, `TRANSLATION_PROVIDER=bhashini` with `BHASHINI_USER_ID`/`BHASHINI_ULCA_API_KEY`/`BHASHINI_PIPELINE_ID` from the ULCA profile, `OTP_PROVIDER=twilio`, `TWILIO_PROVIDER=twilio`, `VISION_PROVIDER=llm`, `GEOCODER=nominatim`) are the same kind of switch. Embedding width must stay `1024` so vectors match the pgvector column.
+To exercise real extraction instead of the stub, set `EXTRACTION_PROVIDER=gpt5mini` and `LLM_API_KEY` in `.env`. Other live adapters (`EMBEDDING_PROVIDER=remote`, `TRANSLATION_PROVIDER=bhashini` with `BHASHINI_USER_ID`/`BHASHINI_ULCA_API_KEY`/`BHASHINI_PIPELINE_ID` from the ULCA profile, `SPEECH_PROVIDER=bhashini` with the same credentials, `OTP_PROVIDER=twilio`, `TWILIO_PROVIDER=twilio`, `VISION_PROVIDER=llm`, `GEOCODER=nominatim`) are the same kind of switch. Embedding width must stay `1024` so vectors match the pgvector column.
 
 ## Review-quality eval gate
 
@@ -220,7 +221,7 @@ Operational steps for outbox lag, notification DLQ replay, zero-downtime index a
 | --- | --- |
 | `build-and-test` | `./gradlew build` in `naukrinearby/`. Testcontainers uses the runner’s Docker daemon (Postgres image built from `docker/postgres`, Elasticsearch 9.4.5, Redis, RustFS). |
 | `test-frontend` | Node 24, `npm ci`, `npm run lint`, `npm run build`. |
-| `e2e` | Compose infra + the backend jar + a production `next start`, then Playwright (`frontend/e2e`): OTP login, apply, consent, Hinglish search, language switch, scam posting through admin approval, offline apply replay, PWA manifest. |
+| `e2e` | Compose infra + the backend jar + a production `next start`, then Playwright (`frontend/e2e`): OTP login, apply, consent, Hinglish search, language switch, scam posting through admin approval, offline apply replay, PWA manifest, the Listen button, and the voice-search recorder fallback (fake microphone → browser WAV → server). |
 | `resume-eval-gate` | After the backend build: Compose infra, boot the jar with `EVAL_ENABLED=true` and `EXTRACTION_PROVIDER=stub`, then `python run_eval.py --ci`. |
 
 There is no deploy job in that workflow. Kubernetes manifests for an API tier (`api` profile, workers off) and a worker tier are in [`naukrinearby/k8s/`](naukrinearby/k8s/). Copy `config-and-secrets.example.yaml` and supply real secrets out of band.
@@ -260,7 +261,7 @@ There is no deploy job in that workflow. Kubernetes manifests for an API tier (`
 | [`docs/adr/0004-expand-contract-migrations.md`](docs/adr/0004-expand-contract-migrations.md) | Flyway change policy |
 | [`docs/adr/0007-trust-and-moderation.md`](docs/adr/0007-trust-and-moderation.md) | Fraud scoring, moderation, trust levels |
 | [`docs/adr/0008-voice-ivr-apply.md`](docs/adr/0008-voice-ivr-apply.md) | Voice-first (IVR) apply |
-| [`docs/adr/0009-vernacular-ux-and-offline-pwa.md`](docs/adr/0009-vernacular-ux-and-offline-pwa.md) | Hindi UI, voice search, offline PWA |
+| [`docs/adr/0009-vernacular-ux-and-offline-pwa.md`](docs/adr/0009-vernacular-ux-and-offline-pwa.md) | Hindi UI, voice search and Listen (Bhashini speech), offline PWA |
 | [`docs/plans/differentiators-implementation-plan.md`](docs/plans/differentiators-implementation-plan.md) | Scope and decisions for the differentiator milestone |
 | [`SCALING.md`](SCALING.md) | How the design scales to millions of users |
 | [`docs/runbooks/operations.md`](docs/runbooks/operations.md) | Outbox, DLQ, reindex, erasure, consent, moderation, IVR setup |

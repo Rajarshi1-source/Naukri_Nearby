@@ -115,7 +115,7 @@ export default async function JobDetailPage({ params }: Props) {
             </div>
           )}
 
-          <JobTranslationPanel slug={job.slug} />
+          <JobTranslationPanel slug={job.slug} title={job.title} description={job.description ?? null} />
           <SkillGapPanel jobId={job.id} />
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t pt-5">

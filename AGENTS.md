@@ -48,6 +48,7 @@ even when the skill is not auto-triggered. The skills remain the authoritative s
 - CP writes (Postgres) / AP reads (Elasticsearch); read-your-writes for the job poster from PG.
 - Idempotency: WhatsApp dedup on `(user_id, job_id)`; ES upsert on `job_id`.
 - Graceful degradation: ES down -> PostGIS `ST_DWithin` fallback; translation down -> send English.
+  Speech (Bhashini ASR/TTS) down -> 503, and the UI falls back to typing or the browser's own voices.
 
 ## Bharat differentiators (ADRs 0007–0009)
 - Fraud scoring is rule-based, synchronous, and offline (`JobRiskScorer`); moderation status rides

@@ -60,7 +60,8 @@ public class ApiRateLimitFilter extends OncePerRequestFilter {
 		chain.doFilter(req, res);
 	}
 
-	private String callerId(HttpServletRequest req) {
+	/** {@code user:<id>} for a signed-in caller, else {@code ip:<address>}; also keys per-feature limits. */
+	public static String callerId(HttpServletRequest req) {
 		Authentication auth = SecurityContextHolder.getContext().getAuthentication();
 		if (auth != null && auth.getPrincipal() instanceof AuthPrincipal principal) {
 			return "user:" + principal.id();

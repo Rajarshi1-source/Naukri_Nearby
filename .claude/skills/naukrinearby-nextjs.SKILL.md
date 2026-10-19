@@ -375,8 +375,14 @@ export default nextConfig;
 
 ### Voice search + transliteration
 - `useSpeechSearch` wraps `window.SpeechRecognition ?? window.webkitSpeechRecognition` with
-  `lang` = `hi-IN` or `en-IN` from the current locale; feature-detect and **hide the mic button**
-  when unsupported. Type the API locally (`src/types/speech.d.ts`) — no `any`.
+  `lang` = `hi-IN` or `en-IN` from the current locale. Type the API locally (`src/types/speech.d.ts`)
+  — no `any`. Where it is missing (Firefox, Android WebViews) the hook switches to `mode: "server"`:
+  record with `MediaRecorder`, convert to 16 kHz mono 16-bit WAV with Web Audio (`src/lib/wav.ts`,
+  no dependency), auto-stop under 30 s, and `POST /api/speech/transcribe` (`speechService`). Hide the
+  mic only when neither path works; the button exposes `data-voice-mode` for tests.
+- `ListenButton` (inside `JobTranslationPanel`, keyed by job + language) speaks the job: browser
+  `speechSynthesis` first when a voice for the language exists, else `GET /api/jobs/{slug}/audio`
+  (Bhashini TTS, `204` = no audio → "not available"). Revoke object URLs and cancel speech on unmount.
 - Hinglish/Devanagari queries are sent as typed; the backend `QueryNormalizer` maps them.
 
 ### Trust, fraud, skill gap, consent

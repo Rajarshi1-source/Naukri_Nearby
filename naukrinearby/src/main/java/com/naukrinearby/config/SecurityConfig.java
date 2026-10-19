@@ -57,6 +57,8 @@ public class SecurityConfig {
 						.requestMatchers("/api/webhooks/**").permitAll()
 						.requestMatchers("/api/internal/**").permitAll() // guarded by X-Eval-Key + @ConditionalOnProperty
 						.requestMatchers(HttpMethod.GET, "/api/jobs/**").permitAll()
+						// Voice search works signed out, like text search; rate-limited per IP in SpeechService.
+						.requestMatchers(HttpMethod.POST, "/api/speech/transcribe").permitAll()
 						.requestMatchers("/actuator/health/**", "/actuator/info").permitAll()
 						// Prometheus scrape: open ONLY on the internal management port (8081); the same
 						// path on any other port still falls through to the ADMIN rule below.

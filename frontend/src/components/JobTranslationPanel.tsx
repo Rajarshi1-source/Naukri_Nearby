@@ -13,16 +13,27 @@ import {
 } from "@/components/ui/select";
 import { CONTENT_LANGUAGES } from "@/i18n";
 import { useI18n } from "@/i18n/I18nProvider";
+import ListenButton from "@/components/ListenButton";
 import { jobService } from "@/services/jobService";
 
 const NONE = "none";
+const DEVANAGARI = /[ऀ-ॿ]/;
 
 /**
  * "Read this job in …" — the job's title and description machine-translated by Bhashini on the server
  * (cached per job version). Defaults to the UI language when that is not English. The original stays
- * on the page above, and a translation is always labelled as one.
+ * on the page above, and a translation is always labelled as one. The Listen button speaks the job in
+ * the chosen language (or the original when none is chosen or the translation is unavailable).
  */
-export default function JobTranslationPanel({ slug }: { slug: string }) {
+export default function JobTranslationPanel({
+  slug,
+  title,
+  description,
+}: {
+  slug: string;
+  title: string;
+  description: string | null;
+}) {
   const { locale, t } = useI18n();
   const [lang, setLang] = useState<string>(locale === "en" ? NONE : locale);
   const enabled = lang !== NONE;
@@ -34,6 +45,14 @@ export default function JobTranslationPanel({ slug }: { slug: string }) {
   });
 
   const unavailable = isError || (data && !data.translated && data.language !== data.sourceLanguage);
+
+  // Same rule as the server: Devanagari text is Hindi, anything else is English.
+  const sourceLang = DEVANAGARI.test(`${title} ${description ?? ""}`) ? "hi" : "en";
+  const listenText = data?.translated
+    ? `${data.title}. ${data.description ?? ""}`
+    : `${title}. ${description ?? ""}`;
+  const listenTextLang = data?.translated ? data.language : sourceLang;
+  const listenLang = enabled ? lang : sourceLang;
 
   return (
     <section className="mt-5 space-y-3" aria-live="polite">
@@ -55,6 +74,15 @@ export default function JobTranslationPanel({ slug }: { slug: string }) {
               ))}
           </SelectContent>
         </Select>
+        {!(enabled && isFetching) && (
+          <ListenButton
+            key={`${slug}:${listenLang}:${listenTextLang}`}
+            slug={slug}
+            lang={listenLang}
+            text={listenText}
+            textLang={listenTextLang}
+          />
+        )}
       </div>
 
       {enabled && isFetching && <p className="text-sm text-muted-foreground">{t.job.translating}</p>}

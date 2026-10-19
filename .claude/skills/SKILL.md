@@ -172,8 +172,14 @@ the response gives `pipelineResponseConfig[].config[].serviceId` and
 callbackUrl` with header `inferenceApiKey.name: value`, body `pipelineTasks[{taskType,
 config:{language, serviceId}}]` + `inputData.input[{source}]` (ASR: `inputData.audio[{audioContent}]`);
 result at `pipelineResponse[0].output[0].target` (TTS: `pipelineResponse[0].audio[0].audioContent`).
-`BhashiniTranslationProvider` caches the config per language pair (`naukri.translation.config-ttl`) and
-drops it on a 401/403 from compute. Never call Bhashini from the browser — the keys stay server-side.
+The exchange lives in one package-private `BhashiniPipelineClient` shared by
+`BhashiniTranslationProvider` (`naukri.translation.provider`) and `BhashiniSpeechProvider`
+(`naukri.speech.provider`, implements `SpeechToTextProvider` + `TextToSpeechProvider`). It caches the
+config per task type + language (`config-ttl`) and drops it on a 401/403 from compute. ASR sends
+`config.audioFormat:"wav"`, `samplingRate:16000` and reads `output[0].source`; TTS sends
+`config.gender:"female"` and decodes `audio[0].audioContent`. Each provider method carries its own
+`@Retry` + `@CircuitBreaker(name="bhashini")` (the client is not a bean). Never call Bhashini from the
+browser — the keys stay server-side — and never log audio, transcripts or spoken text.
 
 The provider-agnostic interface stays as the plan defines it; the HTTP client is the implementation
 detail behind each provider (`Gpt5MiniProvider`, `ClaudeHaikuProvider`, etc.):
@@ -472,6 +478,7 @@ and runbook expect.
 | DPDP consent + export | `Consent` entity (append-only ledger, latest row per purpose wins), `ConsentPurpose` enum `RESUME_PROCESSING`, `WHATSAPP_ALERTS`; `service.ConsentService`; export in `AccountService` | `GET/PUT /api/candidate/consents`, `GET /api/candidate/account/export` |
 | Language | `PUT /api/auth/me/language` updates `users.preferred_language` (`en`, `hi`, …) | — |
 | Job translation | `service.JobTranslationService` → `JobTranslationResponse`; Bhashini via `TranslationService.translate(text, source, target)` (Optional); Redis `jobtr:{jobId}:v{version}:{lang}`, only successful translations cached; source `hi` if Devanagari | `GET /api/jobs/{slug}/translation?lang=` (public, approved jobs only); `naukri.translation.job-cache-ttl` |
+| Speech (ADR 0009) | `service.SpeechService` (`transcribe`, `jobAudio`), `controller.SpeechController`, `util.WavFormat` (bounded RIFF header walk); ports `SpeechToTextProvider`/`TextToSpeechProvider`, `StubSpeechProvider` (default: empty text, no audio) / `BhashiniSpeechProvider`; Redis `jobaudio:{jobId}:v{version}:{spokenLang}` (base64 WAV); limits `rl:speech:asr:{caller}` / `rl:speech:tts:{caller}` via `ApiRateLimitFilter.callerId` | `POST /api/speech/transcribe` (public; multipart `audio` 16 kHz mono 16-bit WAV ≤ 1 MB / 30 s + `lang`; 400/429/503), `GET /api/jobs/{slug}/audio?lang=` (`ACTIVE`+`APPROVED` via `JobService.getPublicJob(slug)`, else 404; 200 `audio/wav` + `Content-Language`, 204 = no audio); `naukri.speech.*` |
 | IVR apply | `service.IvrService` (Redis state `ivr:call:{CallSid}`, TTL 15 min), `controller.IvrController`; TwiML built by `util.TwiML` (shared with the WhatsApp reply) | `POST /api/webhooks/twilio/voice`, `POST /api/webhooks/twilio/voice/gather/{menu|job|confirm}` (step is a path segment so the signed URL is the plain request URL); TwiML responses use `TwiML.CONTENT_TYPE` (explicit UTF-8, or Hindi is garbled) |
 | Parse bulkhead | `@EnableResilientMethods` on a config class; `@ConcurrencyLimit` on the resume-parse entry point | `naukri.resume.parse-concurrency` (default 4) |
 | LLM tracing | `generation.LlmTracer` port: `LogLlmTracer` (`log`), `LangfuseLlmTracer` (`langfuse`, ingestion API, async, failures swallowed), `NoopLlmTracer` (`none`, default) | `naukri.llm-trace.*` (`LLM_TRACER`, `LANGFUSE_HOST`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY`) |

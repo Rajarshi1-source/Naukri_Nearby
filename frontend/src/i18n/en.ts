@@ -55,6 +55,7 @@ export const en = {
     voiceStop: "Stop listening",
     listening: "Listening… speak now",
     voiceError: "Could not hear you. Please try again or type.",
+    transcribing: "Understanding what you said…",
   },
   job: {
     back: "← Back to search",
@@ -68,6 +69,10 @@ export const en = {
     translatedNote: "Machine-translated with Bhashini. It may contain mistakes; the original is above.",
     translating: "Translating…",
     translationUnavailable: "Translation is not available right now.",
+    listen: "Listen",
+    listenStop: "Stop",
+    listenLoading: "Loading audio…",
+    listenUnavailable: "Audio is not available for this job right now.",
   },
   apply: {
     apply: "Apply now",
