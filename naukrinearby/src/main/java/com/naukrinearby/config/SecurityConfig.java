@@ -5,6 +5,7 @@ import java.util.List;
 
 import jakarta.servlet.DispatcherType;
 
+import com.naukrinearby.security.AmbientCredentialCsrfMatcher;
 import com.naukrinearby.security.ApiRateLimitFilter;
 import com.naukrinearby.security.JwtAuthFilter;
 import com.naukrinearby.security.ManagementPortScrapeMatcher;
@@ -21,6 +22,7 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -38,11 +40,14 @@ public class SecurityConfig {
 	@Bean
 	SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
 		http
-				// CSRF is deliberately off (security-and-api.md §A.5c): every authenticated request carries
-				// the JWT in the Authorization header, which a cross-site form or image cannot set, and no
-				// cookie authenticates a request (nn_session is only a UI routing hint). Twilio webhooks
-				// are authenticated by signature. If auth ever moves to cookies, turn CSRF on.
-				.csrf(csrf -> csrf.disable())
+				// CSRF protection is ON, scoped to requests that carry an ambient credential (a servlet
+				// session) — see AmbientCredentialCsrfMatcher and security-and-api.md §A.5c. JWTs travel in
+				// the Authorization header, which cross-site requests cannot set; Twilio webhooks are
+				// authenticated by signature. The token store is a cookie, so checking never creates a
+				// server-side session (the API stays STATELESS).
+				.csrf(csrf -> csrf
+						.requireCsrfProtectionMatcher(new AmbientCredentialCsrfMatcher())
+						.csrfTokenRepository(new CookieCsrfTokenRepository()))
 				.cors(Customizer.withDefaults())
 				.sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(auth -> auth

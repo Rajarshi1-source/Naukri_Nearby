@@ -83,7 +83,9 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())               // safe ONLY because sessions are stateless + JWT in header, not cookies
+            .csrf(csrf -> csrf                          // ON, scoped to ambient credentials — see A.5c
+                .requireCsrfProtectionMatcher(new AmbientCredentialCsrfMatcher())
+                .csrfTokenRepository(new CookieCsrfTokenRepository()))
             .cors(Customizer.withDefaults())            // see A.7
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
@@ -121,10 +123,11 @@ public class SecurityConfig {
 > `ProblemDetail`, or the catch-all `@ExceptionHandler(Exception.class)` turns every denial into a
 > 500. Cover each new role rule with a "wrong role → 403" integration test.
 
-> CSRF note: disabling CSRF is correct **only** because the API is stateless and the token travels
-> in the `Authorization` header (not a cookie). If you ever store the JWT in a cookie, re-enable CSRF
-> protection. Say this explicitly in interviews — "I disabled CSRF because there's no cookie-based
-> session to forge."
+> CSRF note: never `csrf.disable()` (CodeQL `java/spring-disabled-csrf-protection`). CSRF stays on
+> and `AmbientCredentialCsrfMatcher` decides which requests need a token: state-changing requests
+> that present a live servlet session. Bearer-header requests cannot be forged cross-site, so they pass.
+> In interviews: "CSRF attacks ambient credentials; mine is a header token, so I enforce CSRF exactly
+> where an ambient credential could appear — and it switches on by itself if sessions are ever added."
 
 Method-level guard where path rules aren't enough (e.g. a candidate may only read their own profile):
 
@@ -198,12 +201,19 @@ Roles: `CANDIDATE`, `EMPLOYER`, `ADMIN`. There is no self-service ADMIN sign-up.
 
 ### A.5c CSRF
 
-CSRF protection is disabled for the API on purpose: every authenticated request carries the JWT in
-the `Authorization` header, which a cross-site form or image cannot set, and no cookie authenticates
-a request (`nn_session` is only a UI routing hint, read by `proxy.ts`). Twilio webhooks are
-authenticated by signature, not cookies. Keep the explanatory comment next to `csrf(...)` in
-`SecurityConfig`. **If authentication ever moves to cookies (httpOnly access token), CSRF must be
-turned on** (`CookieCsrfTokenRepository` + the SPA handler) for every cookie-authenticated route.
+CSRF protection is **enabled** and scoped by `security.AmbientCredentialCsrfMatcher`: a request
+needs a valid CSRF token when it uses an unsafe method (POST/PUT/PATCH/DELETE) **and** presents an
+ambient credential — a *live* servlet session (`isRequestedSessionIdValid()` or an existing session). A
+session cookie with no live session behind it (stale, forged, or set on `localhost` by another local
+app, since cookies ignore ports) is not a credential and must not trigger a 403.
+Every legitimate client today authenticates with the JWT in the `Authorization` header, which a
+cross-site form, image or script cannot set, and the API never issues a session, so nothing changes
+for them; `nn_session`/`nn_lang` are UI hints, not credentials. Twilio webhooks are authenticated by
+signature. Tokens live in `CookieCsrfTokenRepository`, so a check never creates a server-side session.
+**Never call `csrf.disable()`** (CodeQL `java/spring-disabled-csrf-protection`, alert #9 fixed this
+way). If authentication ever moves to cookies (an httpOnly access-token cookie), add that cookie's name
+to the matcher and give the SPA the token (`CookieCsrfTokenRepository.withHttpOnlyFalse()` + the SPA
+request handler). Covered by `AmbientCredentialCsrfMatcherTest` and `SecurityCsrfIntegrationTests`.
 
 ### A.6 Secrets & configuration
 
