@@ -384,8 +384,9 @@ dimension equal to `naukri.embedding.dims` (1024 for bge-m3).
 
 ## Security & the REST contract
 
-Phone + OTP → JWT, stateless sessions. Use the lambda DSL `SecurityFilterChain`; never disable CSRF
-blindly without understanding the stateless-JWT context; store OTP in Redis with TTL; rate-limit OTP
+Phone + OTP → JWT, stateless sessions. Use the lambda DSL `SecurityFilterChain`; never call
+`csrf.disable()` — CSRF stays on, scoped to ambient (session) credentials by
+`AmbientCredentialCsrfMatcher` (security-and-api.md §A.5c); store OTP in Redis with TTL; rate-limit OTP
 (5/hr) and APIs (100/min) via Redis.
 
 **For anything beyond the basics — the full phone+OTP→JWT flow, RS256 issuance/refresh/revocation,

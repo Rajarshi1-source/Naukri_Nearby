@@ -61,7 +61,7 @@ Existing design notes in the root README stay valid unless revised here.
 | D11 | **Consent is a ledger.** `consents(user_id, purpose, granted, notice_version, created_at)` append-only; the latest row per purpose wins. Purposes: `RESUME_PROCESSING`, `WHATSAPP_ALERTS`. `GET /api/candidate/account/export` returns all personal data as JSON (DPDP right to access). Erasure deletes the ledger with the user. | New (completes G8) |
 | D12 | **Bulkhead = `@ConcurrencyLimit`** (Framework 7, `@EnableResilientMethods`) on the resume-parse entry point, limit `naukri.resume.parse-concurrency` (default 4). Resilience4j stays for retry/circuit breaking on HTTP adapters. | New |
 | D13 | **LLM tracing never ships PII.** `LlmTracer` port: `log` (existing structured line) / `langfuse` (ingestion API, async, failures swallowed) / `none`. Payload = provider, model, prompt version, latency, JSON validity, char counts. Resume text is never sent. | New |
-| D14 | **CSRF stays disabled on the API**, with an explicit code comment and a `csrf.ignoringRequestMatchers` scoped config: auth is a Bearer header, no ambient cookie authenticates a request (`nn_session` is a UI hint only). The CodeQL alert is resolved by documenting/dismissing, not by adding cookie CSRF tokens that would break Twilio webhooks. | Confirmed |
+| D14 | **CSRF is enabled, scoped to ambient credentials** (revised 2026-10-20): `AmbientCredentialCsrfMatcher` requires a token only for unsafe requests that present a live servlet session. Bearer-header clients and Twilio webhooks are unaffected; CodeQL alert #9 is fixed in code rather than dismissed. | Revised |
 | D15 | **E2E tests run against the real stack** (Compose infra + boot jar + `next start`), Playwright Chromium only, in a dedicated CI job after `build-and-test`. | New |
 
 Schema changes follow ADR 0004 (expand-only in this milestone): `V5__trust_and_moderation.sql`,
@@ -129,7 +129,7 @@ Tests (Testcontainers + `RestTestClient`, plus plain unit tests):
 | CodeQL #1–3 workflow permissions | top-level `permissions: contents: read` in `ci.yml` |
 | CodeQL #4 XSS in TwiML | escape with `HtmlUtils.htmlEscape(s, "UTF-8")`; build TwiML in one `TwiML` helper shared by WhatsApp + IVR |
 | CodeQL #5–8 polynomial regex | bounded quantifiers + input length caps in `StubLlmExtractionProvider` and the WhatsApp apply pattern |
-| CodeQL #9 CSRF disabled | D14: keep, document; ask the owner to dismiss with the written justification |
+| CodeQL #9 CSRF disabled | D14 (revised): CSRF enabled with an ambient-credential matcher; no `csrf.disable()` |
 | Dependabot npm (next, sharp, postcss, nanoid, js-yaml, brace-expansion, browserslist, baseline-browser-mapping, source-map-js) | `next@16.4.x`, `eslint-config-next` to match, `overrides` for transitive pins, `npm audit` clean; supersedes Dependabot PR #1 |
 | Dependabot pip `requests` | bump in `eval/requirements.txt` |
 
